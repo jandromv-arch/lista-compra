@@ -150,6 +150,11 @@
     background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;font-size:14px;font-weight:500;
     opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:90%;text-align:center}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .undobar{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:var(--bg);padding:8px 8px 8px 16px;border-radius:12px;font-size:14px;font-weight:500;
+    display:flex;align-items:center;gap:12px;opacity:0;pointer-events:none;transition:.25s;z-index:61;max-width:90%}
+  .undobar.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+  .undobar button{background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:6px 12px;font-weight:600;font-size:13px;cursor:pointer}
   .banner{background:var(--accent-soft);color:var(--accent-soft-ink);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
   #l-suggest{display:none;margin-top:-4px;margin-bottom:8px}
   .sug{padding:11px 13px;border-bottom:1px solid var(--line);cursor:pointer;font-weight:500}
@@ -294,7 +299,7 @@
 <div class="ov" id="ov-name">
   <div class="sheet">
     <h2>¿Quién eres?</h2>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 10px">Para saber quién añade y quién compra cada cosa. Solo tu nombre, sin registro.</p>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 10px">Para saber quién añade y quién compra cada cosa. Solo tu nombre, sin registro.<br>💡 Luego añade la app a tu pantalla de inicio (Compartir → Añadir a pantalla de inicio).</p>
     <input id="name-input" placeholder="Tu nombre" enterkeyhint="done">
     <button class="btn wide" id="name-save" style="margin-top:12px">Guardar</button>
   </div>
@@ -376,6 +381,7 @@
   </div>
 </div>
 
+<div class="undobar" id="undobar"><span class="undo-msg"></span><button id="undo-btn">Deshacer</button></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1597,6 +1603,9 @@ function confetti(){
   })(); }
 }
 function celebrate(){ toast('🎉 ¡Compra completa!'); buzz([18,40,18]); confetti(); }
+var undoFn=null, undoT2=null;
+function showUndo(msg, fn){ undoFn=fn; var u=$('undobar'); u.querySelector('.undo-msg').textContent=msg; u.classList.add('on'); clearTimeout(undoT2); undoT2=setTimeout(function(){ u.classList.remove('on'); undoFn=null; }, 6000); }
+function stripId(o){ var d={}; Object.keys(o||{}).forEach(function(k){ if(k!=='id'&&k!=='_row') d[k]=o[k]; }); return d; }
 
 function macrosDeIngs(ings){
   var t={kcal:0,p:0,c:0,g:0,hay:false};
@@ -1748,7 +1757,7 @@ function addRecipeToList(recetaId,raciones){ var rec=S.recetas.filter(function(r
   return fbAddItems(items).then(function(){return {added:added,skipped:skipped};}); }
 
 /* ================= RENDER ================= */
-function render(){ renderLista(); renderRecetas(); renderMenu(); renderDatalist(); renderDespensa(); renderStaples(); updateAlerts(); }
+function render(){ renderLista(); renderRecetas(); renderMenu(); renderDatalist(); renderDespensa(); renderStaples(); updateAlerts(); if($('ov-gastos')&&$('ov-gastos').classList.contains('on')) renderGastos(); }
 function updateAlerts(){
   var w=$('cfg-warn'); if(!w) return;
   var soon=(S.despensa||[]).filter(function(x){var dd=diasHasta(x.caduca); return dd!=null && dd<=2;});
@@ -1992,7 +2001,7 @@ $('lista-body').addEventListener('click', function(e){
   var a=act.getAttribute('data-act');
   var cur=S.lista.filter(function(i){return i.id===id;})[0];
   if(a==='toggle'){ fbToggleItem(id, cur?!cur.comprado:true); buzz(cur&&!cur.comprado?16:8); }
-  else if(a==='del'){ fbDeleteItem(id); buzz(8); }
+  else if(a==='del'){ var snap=cur?stripId(cur):null; fbDeleteItem(id); buzz(8); if(snap) showUndo('Borrado: '+(cur.nombre||''), function(){ hcol('items').doc(id).set(snap); }); }
   else if(a==='minus'&&cur){ stepQty(cur,-1); buzz(6); }
   else if(a==='plus'&&cur){ stepQty(cur,1); buzz(6); }
   else if(a==='urg'&&cur){ fbSetUrgente(id, !cur.urgente); buzz(14); }
@@ -2015,9 +2024,14 @@ $('it-save').addEventListener('click', function(){
     .then(function(){ toast('Producto actualizado'); });
   $('ov-item').classList.remove('on');
 });
+$('undo-btn').addEventListener('click', function(){ if(undoFn){ undoFn(); undoFn=null; $('undobar').classList.remove('on'); toast('Restaurado'); buzz(10); } });
 $('l-clear').addEventListener('click', function(){
-  if(!db||!S.lista.some(function(i){return i.comprado;})) return;
-  fbClearComprados().then(function(){toast('Comprados vaciados');});
+  if(!db) return;
+  var done=S.lista.filter(function(i){return i.comprado;}); if(!done.length) return;
+  var snaps=done.map(function(i){return {id:i.id, data:stripId(i)};});
+  fbClearComprados().then(function(){
+    showUndo('Vaciados '+snaps.length, function(){ var b=db.batch(); snaps.forEach(function(s){ b.set(hcol('items').doc(s.id), s.data); }); b.commit(); });
+  });
 });
 $('l-desp').addEventListener('click', function(){ $('ov-desp').classList.add('on'); });
 $('l-wa').addEventListener('click', function(){
@@ -2282,16 +2296,20 @@ function renderTicket(){
   $('ticket-meta').textContent=(m.tienda?m.tienda+' · ':'')+(m.fecha||'')+(m.total!=null?' · Total '+String(m.total).replace('.',',')+' €':'')+' — marca lo que aplicar:';
   if(!ticketItems.length){ $('ticket-list').innerHTML='<div class="empty-state" style="padding:16px">No reconocí productos. Prueba otra foto más nítida.</div>'; return; }
   $('ticket-list').innerHTML='<div class="card">'+ticketItems.map(function(it,i){
-    var pr=(it.precio!=null)?String(it.precio).replace('.',',')+' €':'';
-    return '<div class="pv-item'+(it.sel?' sel':'')+'" data-ti="'+i+'"><div class="pv-cb"><svg width="12" height="12" viewBox="0 0 13 13"><path d="M2 7l3 3 6-7" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
-      '<div class="pv-main"><div>'+esc(it.nombre)+'</div></div><div class="pv-tag">'+pr+'</div></div>';
+    return '<div class="pv-item'+(it.sel?' sel':'')+'" data-ti="'+i+'" style="gap:8px"><div class="pv-cb" data-tk="cb"><svg width="12" height="12" viewBox="0 0 13 13"><path d="M2 7l3 3 6-7" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
+      '<input class="tk-n" value="'+esc(it.nombre)+'" style="flex:1;padding:7px 9px;font-size:14px">'+
+      '<input class="tk-p" value="'+(it.precio!=null?it.precio:'')+'" inputmode="decimal" placeholder="€" style="width:58px;padding:7px 6px;font-size:13px;text-align:right"></div>';
   }).join('')+'</div>';
 }
-$('ticket-list').addEventListener('click', function(e){ var r=e.target.closest('[data-ti]'); if(!r)return; var it=ticketItems[+r.getAttribute('data-ti')]; it.sel=!it.sel; r.classList.toggle('sel',it.sel); });
+$('ticket-list').addEventListener('click', function(e){ var cb=e.target.closest('[data-tk="cb"]'); if(!cb)return; var r=cb.closest('[data-ti]'); var it=ticketItems[+r.getAttribute('data-ti')]; it.sel=!it.sel; r.classList.toggle('sel',it.sel); });
+$('ticket-list').addEventListener('input', function(e){ var r=e.target.closest('[data-ti]'); if(!r)return; var it=ticketItems[+r.getAttribute('data-ti')]; if(!it)return;
+  if(e.target.classList.contains('tk-n')) it.nombre=e.target.value;
+  else if(e.target.classList.contains('tk-p')){ var v=parseFloat(String(e.target.value).replace(',','.')); it.precio=isNaN(v)?null:v; }
+});
 $('ticket-cancel').addEventListener('click', function(){ $('ov-ticket').classList.remove('on'); });
 $('ticket-apply').addEventListener('click', function(){
   if(!db) return;
-  var sel=ticketItems.filter(function(it){return it.sel;});
+  var sel=ticketItems.filter(function(it){return it.sel && it.nombre && it.nombre.trim();});
   if(!sel.length){ toast('No marcaste nada'); return; }
   var pend=S.lista.filter(function(i){return !i.comprado;});
   var b=db.batch();
@@ -2315,9 +2333,16 @@ function renderGastos(){
   $('gastos-sum').innerHTML='Este mes: <b>'+totMes.toFixed(2).replace('.',',')+' €</b> · Total histórico: '+totAll.toFixed(2).replace('.',',')+' €';
   if(!c.length){ $('gastos-list').innerHTML='<div class="empty-state" style="padding:16px;color:var(--muted)">Aún no hay compras. Escanea un ticket 🧾.</div>'; return; }
   $('gastos-list').innerHTML='<div class="card">'+c.map(function(x){
-    return '<div class="item"><div class="it-main"><div class="it-name">'+(x.tienda?esc(x.tienda):'Compra')+'</div><div class="it-sub">'+esc(x.fecha||'')+' · '+(x.nItems||0)+' productos'+(x.by?' · '+esc(x.by):'')+'</div></div><div class="qnum" style="min-width:auto;font-weight:700;color:var(--ink)">'+(Number(x.total)||0).toFixed(2).replace('.',',')+' €</div></div>';
+    return '<div class="item"><div class="it-main"><div class="it-name">'+(x.tienda?esc(x.tienda):'Compra')+'</div><div class="it-sub">'+esc(x.fecha||'')+' · '+(x.nItems||0)+' productos'+(x.by?' · '+esc(x.by):'')+'</div></div><div class="qnum" style="min-width:auto;font-weight:700;color:var(--ink)">'+(Number(x.total)||0).toFixed(2).replace('.',',')+' €</div><button class="x" data-compra="'+x.id+'">×</button></div>';
   }).join('')+'</div>';
 }
+function fbDeleteCompra(id){ return hcol('compras').doc(id).delete(); }
+$('gastos-list').addEventListener('click', function(e){
+  var b=e.target.closest('[data-compra]'); if(!b||!db) return;
+  var id=b.getAttribute('data-compra'); var x=(S.compras||[]).filter(function(c){return c.id===id;})[0];
+  if(!window.confirm('¿Borrar esta compra'+(x&&x.total?' de '+(Number(x.total)).toFixed(2).replace('.',',')+' €':'')+'?')) return;
+  fbDeleteCompra(id).then(function(){ toast('Compra borrada'); });
+});
 
 /* habituales */
 fillCats($('hab-cat'));
