@@ -265,10 +265,12 @@
 <script>
 /* ======= CONFIG FIREBASE (pega aquí tu firebaseConfig) ======= */
 var FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  appId: ""
+  apiKey: "AIzaSyA39PkkQZXalAKrtH9EBwTFTIzdVJmshh0",
+  authDomain: "lista-compra-98dad.firebaseapp.com",
+  projectId: "lista-compra-98dad",
+  storageBucket: "lista-compra-98dad.firebasestorage.app",
+  messagingSenderId: "933810773659",
+  appId: "1:933810773659:web:e07341c90fbd332a36303e"
 };
 /* ============================================================= */
 
@@ -1501,11 +1503,9 @@ function initFirebase(){
   db=firebase.firestore();
   try{ db.enablePersistence({synchronizeTabs:true}).catch(function(){}); }catch(e){}
   HID=getHid();
-  firebase.auth().signInAnonymously().catch(function(e){
-    setStatus('Error de acceso','off');
-    $('cfg-warn').innerHTML='<div class="banner">No se pudo entrar. Activa <b>Authentication → Anónimo</b> en Firebase.</div>';
-  });
-  firebase.auth().onAuthStateChanged(function(u){ if(u && !ready){ ready=true; startListeners(); } });
+  // login anónimo opcional (si está activado); no bloquea nada
+  try{ if(firebase.auth) firebase.auth().signInAnonymously().catch(function(){}); }catch(e){}
+  if(!ready){ ready=true; startListeners(); }
 }
 function mapDocs(s){ return s.docs.map(function(d){ var o=d.data()||{}; o.id=d.id; return o; }); }
 function startListeners(){
