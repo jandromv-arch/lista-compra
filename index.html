@@ -308,7 +308,8 @@
 <div class="ov" id="ov-ticket">
   <div class="sheet">
     <h2>🧾 Ticket</h2>
-    <p id="ticket-meta" style="font-size:13px;color:var(--muted);margin:0 0 10px">Leyendo…</p>
+    <p id="ticket-meta" style="font-size:13px;color:var(--muted);margin:0 0 8px">Leyendo…</p>
+    <div style="margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px;color:var(--muted)">💶 Pagó:</span><span id="ticket-payer" style="display:flex;gap:6px;flex-wrap:wrap"></span></div>
     <div id="ticket-list"></div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn" id="ticket-apply" style="flex:1">Aplicar</button>
@@ -320,9 +321,23 @@
 <div class="ov" id="ov-gastos">
   <div class="sheet">
     <h2>💶 Gastos</h2>
-    <div id="gastos-sum" class="menu-sum" style="margin-bottom:10px"></div>
+    <div id="gastos-sum" class="menu-sum" style="margin-bottom:8px"></div>
+    <div id="gastos-reparto"></div>
+    <div style="display:flex;gap:8px;margin:12px 0"><button class="btn ghost sm" id="gasto-add">+ Gasto manual</button></div>
     <div id="gastos-list"></div>
     <div style="margin-top:14px"><button class="btn ghost wide" id="gastos-close">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="ov" id="ov-gasto">
+  <div class="sheet">
+    <h2>+ Gasto manual</h2>
+    <div class="row2">
+      <div class="fld"><label>Importe (€)</label><input id="ga-importe" inputmode="decimal" placeholder="0,00"></div>
+      <div class="fld"><label>Dónde (opcional)</label><input id="ga-tienda" placeholder="Mercadona, bar…"></div>
+    </div>
+    <div class="fld"><label>¿Quién pagó?</label><div id="ga-payer" style="display:flex;gap:6px;flex-wrap:wrap"></div></div>
+    <div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="ga-save" style="flex:1">Guardar</button><button class="btn ghost" id="ga-cancel">Cerrar</button></div>
   </div>
 </div>
 
@@ -2287,12 +2302,26 @@ function sendTicket(dataUrl){
       var d={}; try{ d=JSON.parse(out); }catch(e){ $('ticket-meta').textContent='No pude interpretar el ticket. Prueba otra foto.'; return; }
       ticketMeta={tienda:d.tienda||'', fecha:d.fecha||new Date().toISOString().slice(0,10), total:d.total};
       ticketItems=(d.items||[]).map(function(it){ return {nombre:it.nombre||'', cantidad:it.cantidad||1, precio:(it.precio!=null?it.precio:null), sel:!!it.nombre}; }).filter(function(x){return x.nombre;});
-      renderTicket();
+      ticketPayer=USER||''; renderTicket();
     })
     .catch(function(){ $('ticket-meta').textContent='No se pudo conectar con Gemini. Revisa tu conexión y la clave.'; });
 }
+function peopleKnown(){
+  var set={}; if(USER)set[USER]=1;
+  (S.compras||[]).forEach(function(c){ if(c.by)set[c.by]=1; if(c.de)set[c.de]=1; if(c.a)set[c.a]=1; });
+  S.menu.forEach(function(m){ if(m.user)set[m.user]=1; });
+  (S.lista||[]).forEach(function(i){ if(i.addedBy)set[i.addedBy]=1; if(i.boughtBy)set[i.boughtBy]=1; });
+  return Object.keys(set);
+}
+var ticketPayer=null;
+function renderPayer(){
+  if(!ticketPayer) ticketPayer=USER||'';
+  var ppl=peopleKnown(); if(ppl.indexOf(ticketPayer)<0 && ticketPayer) ppl.push(ticketPayer);
+  $('ticket-payer').innerHTML=ppl.map(function(p){ return '<button class="chip'+(ticketPayer===p?' on':'')+'" data-payer="'+esc(p)+'">'+esc(p||'yo')+'</button>'; }).join('');
+}
+$('ticket-payer').addEventListener('click', function(e){ var b=e.target.closest('[data-payer]'); if(!b)return; ticketPayer=b.getAttribute('data-payer'); renderPayer(); });
 function renderTicket(){
-  var m=ticketMeta;
+  var m=ticketMeta; renderPayer();
   $('ticket-meta').textContent=(m.tienda?m.tienda+' · ':'')+(m.fecha||'')+(m.total!=null?' · Total '+String(m.total).replace('.',',')+' €':'')+' — marca lo que aplicar:';
   if(!ticketItems.length){ $('ticket-list').innerHTML='<div class="empty-state" style="padding:16px">No reconocí productos. Prueba otra foto más nítida.</div>'; return; }
   $('ticket-list').innerHTML='<div class="card">'+ticketItems.map(function(it,i){
@@ -2315,27 +2344,72 @@ $('ticket-apply').addEventListener('click', function(){
   var b=db.batch();
   sel.forEach(function(it){
     var match=pend.filter(function(p){ var pn=normStr(p.nombre), tn=normStr(it.nombre); return pn===tn || (tn.length>3&&pn.indexOf(tn)>-1) || (pn.length>3&&tn.indexOf(pn)>-1); })[0];
-    if(match){ b.update(hcol('items').doc(match.id), {comprado:true, boughtBy:USER||'', precio:(it.precio!=null?String(it.precio):(match.precio||''))}); }
-    else { var ref=hcol('items').doc(); b.set(ref,{nombre:it.nombre,cantidad:String(it.cantidad||''),unidad:'',categoria:'Otros',precio:(it.precio!=null?String(it.precio):''),comprado:true,addedBy:USER||'',boughtBy:USER||'',creado:Date.now()}); }
+    var payer=ticketPayer||USER||'';
+    if(match){ b.update(hcol('items').doc(match.id), {comprado:true, boughtBy:payer, precio:(it.precio!=null?String(it.precio):(match.precio||''))}); }
+    else { var ref=hcol('items').doc(); b.set(ref,{nombre:it.nombre,cantidad:String(it.cantidad||''),unidad:'',categoria:'Otros',precio:(it.precio!=null?String(it.precio):''),comprado:true,addedBy:payer,boughtBy:payer,creado:Date.now()}); }
   });
   var tot=ticketMeta.total; if(tot==null){ tot=0; sel.forEach(function(it){ if(it.precio!=null) tot+=it.precio; }); }
-  b.set(hcol('compras').doc(), {tienda:ticketMeta.tienda||'', fecha:ticketMeta.fecha||new Date().toISOString().slice(0,10), total:Math.round(tot*100)/100, nItems:sel.length, by:USER||'', creado:Date.now()});
+  b.set(hcol('compras').doc(), {tienda:ticketMeta.tienda||'', fecha:ticketMeta.fecha||new Date().toISOString().slice(0,10), total:Math.round(tot*100)/100, nItems:sel.length, by:(ticketPayer||USER||''), creado:Date.now()});
   b.commit().then(function(){ $('ov-ticket').classList.remove('on'); toast('🧾 '+sel.length+' productos aplicados'); buzz(16); switchView('lista'); });
 });
 
 /* gastos */
 $('l-gastos').addEventListener('click', function(){ renderGastos(); $('ov-gastos').classList.add('on'); });
 $('gastos-close').addEventListener('click', function(){ $('ov-gastos').classList.remove('on'); });
+function eur(n){ return (Number(n)||0).toFixed(2).replace('.',','); }
 function renderGastos(){
-  var c=(S.compras||[]).slice().sort(function(a,b){return (b.creado||0)-(a.creado||0);});
-  var mes=new Date().toISOString().slice(0,7), totMes=0, totAll=0;
-  c.forEach(function(x){ var t=Number(x.total)||0; totAll+=t; if(String(x.fecha||'').slice(0,7)===mes) totMes+=t; });
-  $('gastos-sum').innerHTML='Este mes: <b>'+totMes.toFixed(2).replace('.',',')+' €</b> · Total histórico: '+totAll.toFixed(2).replace('.',',')+' €';
-  if(!c.length){ $('gastos-list').innerHTML='<div class="empty-state" style="padding:16px;color:var(--muted)">Aún no hay compras. Escanea un ticket 🧾.</div>'; return; }
+  var all=(S.compras||[]);
+  var shop=all.filter(function(c){return c.tipo!=='saldo';});
+  var saldos=all.filter(function(c){return c.tipo==='saldo';});
+  var paid={}, settlePaid={}, settleRecv={}, totalShop=0, mes=new Date().toISOString().slice(0,7), totMes=0;
+  shop.forEach(function(c){ var t=Number(c.total)||0; totalShop+=t; paid[c.by||'?']=(paid[c.by||'?']||0)+t; if(String(c.fecha||'').slice(0,7)===mes) totMes+=t; });
+  saldos.forEach(function(s){ var im=Number(s.total)||0; settlePaid[s.de]=(settlePaid[s.de]||0)+im; settleRecv[s.a]=(settleRecv[s.a]||0)+im; });
+  $('gastos-sum').innerHTML='Este mes: <b>'+eur(totMes)+' €</b> · Total histórico: '+eur(totalShop)+' €';
+  var pplset={}; Object.keys(paid).forEach(function(k){if(k&&k!=='?')pplset[k]=1;}); if(USER)pplset[USER]=1; peopleKnown().forEach(function(p){if(p)pplset[p]=1;});
+  var people=Object.keys(pplset);
+  var rep=$('gastos-reparto');
+  if(people.length===2 && totalShop>0){
+    var a=people[0], b=people[1];
+    var balA=(paid[a]||0)-totalShop/2+(settlePaid[a]||0)-(settleRecv[a]||0);
+    var paidLine='<div style="margin-top:4px">'+esc(a)+' pagó <b>'+eur(paid[a]||0)+' €</b> · '+esc(b)+' pagó <b>'+eur(paid[b]||0)+' €</b></div>';
+    var amt=Math.abs(balA), balLine;
+    if(amt<0.01){ balLine='<div style="margin-top:6px">🤝 Estáis en paz</div>'; }
+    else { var debtor=balA>0?b:a, creditor=balA>0?a:b;
+      balLine='<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span><b>'+esc(debtor)+'</b> le debe <b>'+eur(amt)+' €</b> a '+esc(creditor)+'</span><button class="chip on" id="saldar-btn" data-de="'+esc(debtor)+'" data-a="'+esc(creditor)+'" data-im="'+amt.toFixed(2)+'">Saldar ✓</button></div>'; }
+    rep.innerHTML='<div class="banner" style="background:var(--accent-soft);color:var(--accent-soft-ink);border-color:var(--accent)"><b>Reparto 50/50</b>'+paidLine+balLine+'</div>';
+  } else { rep.innerHTML=''; }
+  var c=all.slice().sort(function(x,y){return (y.creado||0)-(x.creado||0);});
+  if(!c.length){ $('gastos-list').innerHTML='<div class="empty-state" style="padding:16px;color:var(--muted)">Aún no hay compras. Escanea un ticket 🧾 o añade un gasto manual.</div>'; return; }
   $('gastos-list').innerHTML='<div class="card">'+c.map(function(x){
-    return '<div class="item"><div class="it-main"><div class="it-name">'+(x.tienda?esc(x.tienda):'Compra')+'</div><div class="it-sub">'+esc(x.fecha||'')+' · '+(x.nItems||0)+' productos'+(x.by?' · '+esc(x.by):'')+'</div></div><div class="qnum" style="min-width:auto;font-weight:700;color:var(--ink)">'+(Number(x.total)||0).toFixed(2).replace('.',',')+' €</div><button class="x" data-compra="'+x.id+'">×</button></div>';
+    if(x.tipo==='saldo'){
+      return '<div class="item"><div class="it-main"><div class="it-name">🤝 Saldo</div><div class="it-sub">'+esc(x.fecha||'')+' · '+esc(x.de||'')+' → '+esc(x.a||'')+'</div></div><div class="qnum" style="min-width:auto;font-weight:700;color:var(--ink)">'+eur(x.total)+' €</div><button class="x" data-compra="'+x.id+'">×</button></div>';
+    }
+    return '<div class="item"><div class="it-main"><div class="it-name">'+(x.tienda?esc(x.tienda):'Compra')+'</div><div class="it-sub">'+esc(x.fecha||'')+(x.nItems?' · '+x.nItems+' productos':'')+(x.by?' · pagó '+esc(x.by):'')+'</div></div><div class="qnum" style="min-width:auto;font-weight:700;color:var(--ink)">'+eur(x.total)+' €</div><button class="x" data-compra="'+x.id+'">×</button></div>';
   }).join('')+'</div>';
 }
+$('gastos-reparto').addEventListener('click', function(e){
+  var s=e.target.closest('#saldar-btn'); if(!s||!db) return;
+  var de=s.getAttribute('data-de'), a=s.getAttribute('data-a'), im=Number(s.getAttribute('data-im'))||0;
+  if(!window.confirm(de+' paga '+eur(im)+' € a '+a+' para quedar en paz. ¿Registrar?')) return;
+  hcol('compras').add({tipo:'saldo', de:de, a:a, total:im, fecha:new Date().toISOString().slice(0,10), by:de, creado:Date.now()}).then(function(){ toast('Cuentas saldadas 🤝'); buzz(14); });
+});
+/* gasto manual */
+$('gasto-add').addEventListener('click', function(){
+  $('ga-importe').value=''; $('ga-tienda').value='';
+  var ppl=peopleKnown(); if(!ppl.length&&USER)ppl=[USER];
+  window._gaPayer=USER||ppl[0]||'';
+  $('ga-payer').innerHTML=ppl.map(function(p){ return '<button class="chip'+(window._gaPayer===p?' on':'')+'" data-gp="'+esc(p)+'">'+esc(p||'yo')+'</button>'; }).join('');
+  $('ov-gasto').classList.add('on');
+});
+$('ga-payer').addEventListener('click', function(e){ var b=e.target.closest('[data-gp]'); if(!b)return; window._gaPayer=b.getAttribute('data-gp');
+  [].slice.call($('ga-payer').children).forEach(function(c){ c.classList.toggle('on', c.getAttribute('data-gp')===window._gaPayer); });
+});
+$('ga-cancel').addEventListener('click', function(){ $('ov-gasto').classList.remove('on'); });
+$('ga-save').addEventListener('click', function(){
+  var im=parseFloat(String($('ga-importe').value).replace(',','.')); if(isNaN(im)||im<=0||!db){ $('ga-importe').focus(); return; }
+  hcol('compras').add({tienda:$('ga-tienda').value.trim()||'Gasto', fecha:new Date().toISOString().slice(0,10), total:Math.round(im*100)/100, nItems:0, by:window._gaPayer||USER||'', manual:true, creado:Date.now()})
+    .then(function(){ $('ov-gasto').classList.remove('on'); toast('Gasto guardado'); buzz(12); });
+});
 function fbDeleteCompra(id){ return hcol('compras').doc(id).delete(); }
 $('gastos-list').addEventListener('click', function(e){
   var b=e.target.closest('[data-compra]'); if(!b||!db) return;
@@ -2374,7 +2448,7 @@ $('hab-addall').addEventListener('click', function(){
   });
 });
 
-['ov-rec','ov-slot','ov-gen','ov-desp','ov-name','ov-cfg','ov-hab','ov-item','ov-ticket','ov-gastos'].forEach(function(id){ $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); }); });
+['ov-rec','ov-slot','ov-gen','ov-desp','ov-name','ov-cfg','ov-hab','ov-item','ov-ticket','ov-gastos','ov-gasto'].forEach(function(id){ $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); }); });
 
 /* tema: eventos */
 function openCfg(){ renderCfg(); $('cfg-ticket').value=localStorage.getItem('lcr_gemini_key')||''; $('ov-cfg').classList.add('on'); }
