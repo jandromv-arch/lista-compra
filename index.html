@@ -1529,7 +1529,7 @@ function macrosDeIngs(ings){
 function macroBadge(ings){ var m=macrosDeIngs(ings); if(!m.hay) return ''; return '<span class="macro">🔥 '+m.kcal+' kcal · 💪 '+m.p+'g P</span>'; }
 
 var S = {lista:[],recetas:[],menu:[],favs:[],despensa:[],staples:[]};
-var slotCtx = null, recQuery='', recFilter='all', editingRec=null, genItems=[];
+var slotCtx = null, recQuery='', recFilter='all', editingRec=null, genItems=[], menuUser=null;
 var USER = localStorage.getItem('lcr_user')||'';
 
 /* ===== tema ===== */
@@ -1629,10 +1629,10 @@ function fbDeleteRecipe(id){ var b=db.batch(); b.delete(hcol('recipes').doc(id))
 function fbToggleFav(id){ var r=S.recetas.filter(function(x){return x.id===id;})[0]; return hcol('recipes').doc(id).update({fav: !(r&&r.fav)}); }
 function fbAddDespensa(n,cat){ if(S.despensa.some(function(x){return normStr(x.nombre)===normStr(n);})) return Promise.resolve(); return hcol('pantry').add({nombre:n,categoria:cat||'Otros'}); }
 function fbRemoveDespensa(nombre){ var d=S.despensa.filter(function(x){return normStr(x.nombre)===normStr(nombre);})[0]; return d?hcol('pantry').doc(d.id).delete():Promise.resolve(); }
-function fbSetMenu(dia,momento,recetaId,raciones){ var docId=dia+'__'+momento;
+function fbSetMenu(dia,momento,recetaId,raciones){ var docId=normStr(USER||'yo')+'__'+dia+'__'+momento;
   if(!recetaId){ return hcol('menu').doc(docId).delete(); }
-  return hcol('menu').doc(docId).set({dia:dia,momento:momento,recetaId:recetaId,raciones:Number(raciones)||0}); }
-function fbClearMenu(){ var b=db.batch(); S.menu.forEach(function(m){ b.delete(hcol('menu').doc(m.id)); }); return b.commit(); }
+  return hcol('menu').doc(docId).set({user:USER||'', dia:dia,momento:momento,recetaId:recetaId,raciones:Number(raciones)||0}); }
+function fbClearMenu(){ var b=db.batch(); S.menu.filter(function(m){return (m.user||'')===(USER||'');}).forEach(function(m){ b.delete(hcol('menu').doc(m.id)); }); return b.commit(); }
 function fbAddItems(items){ var b=db.batch(); var pres={}; S.lista.forEach(function(i){pres[normStr(i.nombre)]=true;});
   (items||[]).forEach(function(it){ if(!it.nombre||pres[normStr(it.nombre)]) return; var ref=hcol('items').doc();
     b.set(ref,{nombre:it.nombre,cantidad:it.cantidad||'',unidad:it.unidad||'',categoria:it.categoria||'Otros',comprado:false,addedBy:USER||'',boughtBy:'',creado:Date.now()}); pres[normStr(it.nombre)]=true; });
@@ -1771,26 +1771,45 @@ function scaledMacros(rec, slotRac){
   var m=macrosDeIngs(rec.ingredientes);
   return {kcal:Math.round(m.kcal*factor), p:Math.round(m.p*factor), hay:m.hay};
 }
+function menuUsers(){
+  var set={}; S.menu.forEach(function(m){ if(m.user) set[m.user]=1; });
+  if(USER) set[USER]=1;
+  return Object.keys(set);
+}
 function renderMenu(){
+  if(menuUser==null) menuUser=USER||'ALL';
   var body=$('menu-body');
-  var byKey={}; S.menu.forEach(function(m){byKey[m.dia+'|'+m.momento]=m;});
   var recById={}; S.recetas.forEach(function(r){recById[r.id]=r;});
+  var users=menuUsers();
+  var chips=users.map(function(u){ return '<button class="chip'+(menuUser===u?' on':'')+'" data-mu="'+esc(u)+'">'+(u===USER?'🙂 '+esc(u):'👤 '+esc(u))+'</button>'; });
+  chips.push('<button class="chip'+(menuUser==='ALL'?' on':'')+'" data-mu="ALL">🍽️ Ambos</button>');
+  var head='<div class="filters">'+chips.join('')+'</div>';
   var wk={kcal:0,p:0,hay:false};
   var html=DIAS.map(function(d){
     var dk=0,dp=0,dhay=false;
     var slots=MOMENTOS.map(function(mo){
-      var m=byKey[d+'|'+mo];
+      if(menuUser==='ALL'){
+        var ms=S.menu.filter(function(m){return m.dia===d&&m.momento===mo&&m.recetaId;});
+        var inner=ms.map(function(m){ var rec=recById[m.recetaId]; if(!rec)return '';
+          var sm=scaledMacros(rec,m.raciones); if(sm.hay){dk+=sm.kcal;dp+=sm.p;dhay=true;wk.kcal+=sm.kcal;wk.p+=sm.p;wk.hay=true;}
+          return '<div class="val" style="font-size:13px">'+esc(rec.nombre)+' <span style="color:var(--muted);font-weight:500">· '+esc(m.user||'?')+'</span></div>';
+        }).join('');
+        return '<div class="card slot'+(ms.length?'':' empty')+'" data-ro="1"><div class="lbl">'+mo+'</div>'+(inner||'<div class="val">—</div>')+'</div>';
+      }
+      var m=S.menu.filter(function(x){return x.dia===d&&x.momento===mo&&x.user===menuUser;})[0];
       var rec=m?recById[m.recetaId]:null;
       if(rec){ var sm=scaledMacros(rec,m.raciones); if(sm.hay){dk+=sm.kcal;dp+=sm.p;dhay=true;wk.kcal+=sm.kcal;wk.p+=sm.p;wk.hay=true;} }
-      var val=rec?esc(rec.nombre):'+ añadir';
-      return '<div class="card slot'+(rec?'':' empty')+'" data-dia="'+esc(d)+'" data-mom="'+mo+'">'+
+      var editable=(menuUser===USER);
+      var val=rec?esc(rec.nombre):(editable?'+ añadir':'—');
+      return '<div class="card slot'+(rec?'':' empty')+'" data-dia="'+esc(d)+'" data-mom="'+mo+'"'+(editable?'':' data-ro="1"')+'>'+
         '<div class="lbl">'+mo+'</div><div class="val">'+val+'</div></div>';
     }).join('');
     var ds=dhay?'<span class="day-sum">· '+dk+' kcal · '+dp+'g P</span>':'';
     return '<div class="day"><h3>'+esc(d)+ds+'</h3><div class="slots">'+slots+'</div></div>';
   }).join('');
-  var sum=wk.hay?'<div class="menu-sum">Semana: <b>'+wk.kcal+' kcal</b> · '+wk.p+'g proteína ('+Math.round(wk.kcal/7)+' kcal/día aprox.)</div>':'';
-  body.innerHTML=sum+html;
+  var who = menuUser==='ALL'?'de los dos':(menuUser===USER?'tuyo':'de '+menuUser);
+  var sum=wk.hay?'<div class="menu-sum">Menú '+esc(who)+': <b>'+wk.kcal+' kcal</b> · '+wk.p+'g proteína</div>':'';
+  body.innerHTML=head+sum+html;
 }
 function renderDatalist(){
   var names={};
@@ -1919,12 +1938,15 @@ $('rec-del').addEventListener('click', function(){
 });
 
 $('menu-body').addEventListener('click', function(e){
+  var chip=e.target.closest('[data-mu]');
+  if(chip){ menuUser=chip.getAttribute('data-mu'); renderMenu(); return; }
   var slot=e.target.closest('.slot'); if(!slot) return;
+  if(slot.getAttribute('data-ro')){ if(menuUser!==USER) toast('Toca 🙂 '+(USER||'tu nombre')+' para editar tu menú'); return; }
   openSlot(slot.getAttribute('data-dia'), slot.getAttribute('data-mom'));
 });
 function openSlot(dia,mom){
   slotCtx={dia:dia,momento:mom};
-  var cur=S.menu.filter(function(m){return m.dia===dia&&m.momento===mom;})[0];
+  var cur=S.menu.filter(function(m){return m.dia===dia&&m.momento===mom&&m.user===USER;})[0];
   $('slot-title').textContent=dia+' · '+mom;
   if(!S.recetas.length){
     $('slot-list').innerHTML='<div class="empty-state" style="padding:20px">Primero crea recetas en la pestaña 📖</div>';
@@ -2037,7 +2059,7 @@ $('cfg-modes').addEventListener('click', function(e){ var b=e.target.closest('[d
 /* identidad */
 function refreshWho(){ $('who').textContent='👤 '+(USER||'yo'); }
 $('who').addEventListener('click', function(){ $('name-input').value=USER; $('ov-name').classList.add('on'); setTimeout(function(){$('name-input').focus();},100); });
-$('name-save').addEventListener('click', function(){ var n=$('name-input').value.trim(); if(!n) return; USER=n; localStorage.setItem('lcr_user',n); refreshWho(); $('ov-name').classList.remove('on'); });
+$('name-save').addEventListener('click', function(){ var n=$('name-input').value.trim(); if(!n) return; USER=n; localStorage.setItem('lcr_user',n); menuUser=USER; refreshWho(); $('ov-name').classList.remove('on'); render(); });
 $('name-input').addEventListener('keydown', function(e){ if(e.key==='Enter') $('name-save').click(); });
 
 /* invitar */
