@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Lista & Recetas">
+<meta name="theme-color" content="#f6f1e7">
+<title>Lista & Recetas</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%92%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#f6f1e7; --card:#fffdf8; --ink:#2a2622; --muted:#8a8178;
+    --line:#e7ddcd; --accent:#e8622c; --accent-soft:#fdeadf;
+    --green:#3c8a4e; --green-soft:#e4f1e5; --shadow:0 1px 2px rgba(60,45,30,.06),0 6px 20px rgba(60,45,30,.06);
+    --r:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:16px;-webkit-font-smoothing:antialiased}
+  body{padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+  .top{position:sticky;top:0;z-index:20;background:rgba(246,241,231,.9);backdrop-filter:blur(10px);
+    padding:calc(env(safe-area-inset-top) + 12px) 16px 10px;border-bottom:1px solid var(--line)}
+  .toprow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;max-width:620px;margin:0 auto}
+  .top h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.02em}
+  .sync{font-size:12px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+  .dot.load{background:var(--accent);animation:p 1s infinite}
+  .dot.off{background:#c0392b}
+  @keyframes p{50%{opacity:.3}}
+  .topbtns{display:flex;gap:6px;flex:none}
+  main{padding:14px 16px 20px;max-width:620px;margin:0 auto}
+  .view{display:none}.view.on{display:block;animation:f .2s ease}
+  @keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+  input,select,textarea,button{font:inherit;color:inherit}
+  input,select,textarea{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:12px;
+    background:#fff;outline:none}
+  input:focus,select,textarea:focus{border-color:var(--accent)}
+  select{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a8178' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 13px center}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;border-radius:12px;
+    padding:12px 15px;font-weight:600;background:var(--accent);color:#fff;cursor:pointer}
+  .btn:active{transform:scale(.98)}
+  .btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+  .btn.sm{padding:8px 11px;font-size:14px;border-radius:10px}
+  .btn.wide{width:100%}
+  .addbar{display:grid;grid-template-columns:1fr 58px 64px;gap:8px;margin-bottom:8px}
+  .addbar2{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:16px}
+  .cat{margin:18px 0 8px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .item{display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--line)}
+  .item:last-child{border-bottom:none}
+  .check{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--line);background:#fff;
+    display:grid;place-items:center;cursor:pointer;transition:.15s}
+  .item.done .check{background:var(--green);border-color:var(--green)}
+  .check svg{opacity:0}.item.done .check svg{opacity:1}
+  .it-main{flex:1;min-width:0}
+  .it-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .it-sub{font-size:13px;color:var(--muted)}
+  .item.done .it-name{text-decoration:line-through;color:var(--muted)}
+  .x{flex:none;color:var(--muted);background:none;border:none;font-size:20px;padding:4px 6px;cursor:pointer;line-height:1}
+  .rec{padding:15px 16px;margin-bottom:12px}
+  .rec h3{margin:0 0 3px;font-size:17px;letter-spacing:-.01em}
+  .rec .meta{font-size:13px;color:var(--muted);margin-bottom:10px}
+  .rec-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .ing-chip{display:inline-block;font-size:12.5px;background:var(--accent-soft);color:#b14216;
+    padding:3px 9px;border-radius:999px;margin:0 5px 5px 0}
+  .day{margin-bottom:14px}
+  .day h3{margin:0 0 7px;font-size:15px}
+  .slots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .slot{padding:11px 12px;min-height:60px;display:flex;flex-direction:column;justify-content:center;cursor:pointer}
+  .slot .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:3px}
+  .slot .val{font-weight:600;font-size:14px;line-height:1.2}
+  .slot.empty .val{color:var(--muted);font-weight:500}
+  .empty-state{text-align:center;color:var(--muted);padding:40px 20px}
+  .empty-state .big{font-size:40px;margin-bottom:8px}
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;
+    background:rgba(255,253,248,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom)}
+  nav button{flex:1;background:none;border:none;padding:10px 4px 8px;color:var(--muted);
+    display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;cursor:pointer}
+  nav button .ic{font-size:21px}
+  nav button.on{color:var(--accent)}
+  .ov{position:fixed;inset:0;z-index:50;background:rgba(40,30,20,.4);display:none;
+    align-items:flex-end;justify-content:center}
+  .ov.on{display:flex}
+  .sheet{background:var(--bg);width:100%;max-width:620px;max-height:92vh;overflow:auto;
+    border-radius:22px 22px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));animation:up .25s ease}
+  @keyframes up{from{transform:translateY(30px)}to{transform:none}}
+  .sheet h2{margin:2px 0 14px;font-size:19px}
+  .fld{margin-bottom:12px}
+  .fld label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:5px}
+  .ingrow{display:grid;grid-template-columns:1fr 54px 56px 30px;gap:6px;margin-bottom:7px;align-items:center}
+  .ingrow .x{font-size:22px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .macro{display:inline-block;font-size:12px;font-weight:600;color:#9a5a2a;background:#fbe9db;
+    padding:3px 9px;border-radius:999px;margin-top:2px}
+  .rec .star{position:absolute;top:13px;right:14px;font-size:20px;background:none;border:none;cursor:pointer;line-height:1;opacity:.35}
+  .rec .star.on{opacity:1}
+  .rec{position:relative}
+  .filters{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;-webkit-overflow-scrolling:touch}
+  .chip{flex:none;border:1px solid var(--line);background:var(--card);color:var(--muted);
+    padding:7px 13px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .searchbar{position:relative;margin-bottom:10px}
+  .searchbar input{padding-left:38px}
+  .searchbar::before{content:"🔍";position:absolute;left:13px;top:11px;font-size:15px;opacity:.5}
+  .pv-item{display:flex;align-items:center;gap:11px;padding:11px 4px;border-bottom:1px solid var(--line)}
+  .pv-item:last-child{border-bottom:none}
+  .pv-item.have{opacity:.5}
+  .pv-cb{flex:none;width:22px;height:22px;border-radius:6px;border:2px solid var(--line);background:#fff;
+    display:grid;place-items:center;cursor:pointer}
+  .pv-item.sel .pv-cb{background:var(--accent);border-color:var(--accent)}
+  .pv-cb svg{opacity:0}.pv-item.sel .pv-cb svg{opacity:1}
+  .pv-main{flex:1;min-width:0}
+  .pv-tag{font-size:11px;color:var(--muted)}
+  .menu-sum{font-size:13px;color:var(--muted);margin-top:4px}
+  .day-sum{font-size:12px;color:var(--muted);margin-left:6px;font-weight:500}
+  .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:11px 16px;border-radius:12px;font-size:14px;font-weight:500;
+    opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:90%;text-align:center}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .banner{background:var(--accent-soft);color:#8f3d14;border:1px solid #f3cdb6;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="toprow">
+    <div>
+      <h1 id="ttl">🛒 Lista de la compra</h1>
+      <div class="sync"><span class="dot" id="dot"></span><span id="synctx">Conectando…</span></div>
+    </div>
+    <div class="topbtns">
+      <button class="btn ghost sm" id="who">👤</button>
+      <button class="btn ghost sm" id="invite" title="Invitar a tu pareja">👥</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <section class="view on" id="v-lista">
+    <div id="cfg-warn"></div>
+    <div class="addbar">
+      <input id="l-nombre" placeholder="Añadir producto…" enterkeyhint="done" list="prod-list" autocomplete="off">
+      <input id="l-cant" placeholder="Cant." inputmode="decimal">
+      <input id="l-unid" placeholder="ud.">
+    </div>
+    <datalist id="prod-list"></datalist>
+    <div class="addbar2">
+      <select id="l-cat"></select>
+      <button class="btn" id="l-add">Añadir</button>
+    </div>
+    <div id="lista-body"></div>
+    <div style="margin-top:18px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="btn ghost sm" id="l-wa">📲 Enviar por WhatsApp</button>
+      <button class="btn ghost sm" id="l-desp">🧺 Despensa</button>
+      <button class="btn ghost sm" id="l-clear">Vaciar comprados</button>
+    </div>
+  </section>
+
+  <section class="view" id="v-recetas">
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn" id="r-new" style="flex:1">+ Nueva receta</button>
+      <button class="btn ghost sm" id="r-rand" title="Receta al azar">🎲</button>
+      <button class="btn ghost sm" id="r-seed" title="Cargar recetas Plan Fit">📥</button>
+    </div>
+    <div class="searchbar"><input id="r-search" placeholder="Buscar receta o ingrediente…" autocomplete="off"></div>
+    <div class="filters" id="r-filters"></div>
+    <div id="recetas-body"></div>
+  </section>
+
+  <section class="view" id="v-menu">
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn" id="m-gen" style="flex:1">🧾 Generar lista de la compra</button>
+      <button class="btn ghost sm" id="m-clear">Vaciar</button>
+    </div>
+    <div id="menu-body"></div>
+  </section>
+</main>
+
+<nav>
+  <button class="on" data-v="lista"><span class="ic">🛒</span>Lista</button>
+  <button data-v="recetas"><span class="ic">📖</span>Recetas</button>
+  <button data-v="menu"><span class="ic">🗓️</span>Menú</button>
+</nav>
+
+<div class="ov" id="ov-rec">
+  <div class="sheet">
+    <h2 id="rec-title">Nueva receta</h2>
+    <div class="fld"><label>Nombre</label><input id="rec-nombre" placeholder="Ej. Lentejas"></div>
+    <div class="row2">
+      <div class="fld"><label>Tipo</label><select id="rec-grupo"></select></div>
+      <div class="fld"><label>Raciones</label><input id="rec-rac" type="number" inputmode="numeric" value="2" min="1"></div>
+    </div>
+    <div class="fld">
+      <label>Ingredientes</label>
+      <div id="rec-ings"></div>
+      <button class="btn ghost sm" id="rec-adding" style="margin-top:4px">+ Ingrediente</button>
+    </div>
+    <div class="fld"><label>Preparación (opcional)</label><textarea id="rec-pasos" rows="4" placeholder="Pasos…"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn" id="rec-save" style="flex:1">Guardar</button>
+      <button class="btn ghost" id="rec-del" style="display:none">Eliminar</button>
+      <button class="btn ghost" id="rec-cancel">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov-slot">
+  <div class="sheet">
+    <h2 id="slot-title">Asignar receta</h2>
+    <div class="fld" style="max-width:160px"><label>Raciones</label><input id="slot-rac" type="number" inputmode="numeric" min="1"></div>
+    <div id="slot-list"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn ghost" id="slot-remove" style="flex:1">Quitar del menú</button>
+      <button class="btn ghost" id="slot-cancel">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov-gen">
+  <div class="sheet">
+    <h2>Lo que falta del menú</h2>
+    <p id="gen-hint" style="font-size:13px;color:var(--muted);margin:0 0 10px">Marca lo que quieres añadir. Lo que ya tienes en lista o despensa viene desmarcado.</p>
+    <div id="gen-list"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" id="gen-add" style="flex:1">Añadir a la lista</button>
+      <button class="btn ghost" id="gen-cancel">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov-desp">
+  <div class="sheet">
+    <h2>🧺 Despensa (ya tengo en casa)</h2>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 10px">Lo que esté aquí no se añade al generar la compra del menú.</p>
+    <div class="addbar2" style="margin-bottom:12px">
+      <input id="desp-nombre" placeholder="Ej. Sal, aceite, especias…" list="prod-list">
+      <button class="btn" id="desp-add">Añadir</button>
+    </div>
+    <div id="desp-list"></div>
+    <div style="margin-top:14px"><button class="btn ghost wide" id="desp-cancel">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="ov" id="ov-name">
+  <div class="sheet">
+    <h2>¿Quién eres?</h2>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 10px">Para saber quién añade y quién compra cada cosa. Solo tu nombre, sin registro.</p>
+    <input id="name-input" placeholder="Tu nombre" enterkeyhint="done">
+    <button class="btn wide" id="name-save" style="margin-top:12px">Guardar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+/* ======= CONFIG FIREBASE (pega aquí tu firebaseConfig) ======= */
+var FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  appId: ""
+};
+/* ============================================================= */
+
+var CATS = [
+  ['Frutas y verduras','🥬'],['Carne y pescado','🥩'],['Lácteos y huevos','🧀'],
+  ['Panadería','🍞'],['Despensa','🥫'],['Congelados','🧊'],
+  ['Bebidas','🥤'],['Limpieza y hogar','🧼'],['Otros','📦']
+];
+var CAT_EMOJI = {}; CATS.forEach(function(c){CAT_EMOJI[c[0]]=c[1];});
+var GRUPOS = [['Desayuno','🌅'],['Comida','🍽️'],['Cena','🌙'],['Snack','🍏'],['Otro','🍴']];
+var GRUPO_ORD = {}; GRUPOS.forEach(function(g,i){GRUPO_ORD[g[0]]=i;});
+var GRUPO_EMOJI = {}; GRUPOS.forEach(function(g){GRUPO_EMOJI[g[0]]=g[1];});
+var DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+var MOMENTOS=['Comida','Cena'];
+var MACROS = {"huevos":[78,6.5,0.6,5.5,"u"],"claras de huevo":[0.48,0.11,0.007,0.002,"ml"],"yogur proteico 0%":[0.63,0.1,0.04,0.002,"ml"],"queso sin lactosa":[3,0.25,0.02,0.22,"g"],"requeson":[0.97,0.12,0.03,0.04,"g"],"pechuga de pollo":[1.1,0.23,0,0.02,"g"],"pechuga de pavo":[1.05,0.22,0,0.01,"g"],"ternera picada magra o filete":[1.75,0.195,0,0.11,"g"],"lomo de cerdo":[1.3,0.21,0,0.05,"g"],"merluza":[0.85,0.18,0,0.02,"g"],"salmon":[2,0.2,0,0.13,"g"],"atun al natural (latas)":[100,23,0,1,"u"],"jamon york / pavo en lonchas":[1.05,0.19,0.01,0.03,"g"],"patata":[0.77,0.02,0.17,0.001,"g"],"boniato":[0.86,0.016,0.2,0.001,"g"],"arroz":[3.55,0.07,0.78,0.01,"g"],"pasta integral":[3.6,0.12,0.72,0.015,"g"],"avena":[3.8,0.13,0.6,0.07,"g"],"pan integral de molde":[80,3,13,1.2,"u"],"tortas de arroz":[28,0.6,5.8,0.2,"u"],"tortillas de maiz":[90,2,17,1.5,"u"],"fajitas integrales":[140,3.5,24,3,"u"],"fruta (piezas)":[90,1,20,0.3,"u"],"frutos rojos":[0.45,0.007,0.08,0.003,"g"],"aguacate":[1.6,0.02,0.09,0.15,"g"],"aove":[9,0,0,1,"ml"],"almendras":[6,0.21,0.04,0.53,"g"],"mantequilla de cacahuete":[6,0.25,0.1,0.5,"g"],"verdura (brocoli, calabacin, judias…)":[0.35,0.02,0.05,0.003,"g"],"ensalada (tomate, cebolla, lechuga)":[0.25,0.01,0.04,0.002,"g"],"tomate triturado":[0.25,0.01,0.04,0,"g"],"pudding proteico":[120,15,8,3,"u"],"salsas 0% (ketchup, bbq)":[10,0,2,0,"u"],"proteina en polvo (1 scoop = 30 g)":[120,24,2,1.5,"u"],"creatina monohidrato":[0,0,0,0,"u"],"tofu firme":[1.44,0.16,0.02,0.09,"g"],"lentejas cocidas (bote)":[0.95,0.09,0.12,0.005,"g"],"garbanzos cocidos (bote)":[1.2,0.08,0.15,0.02,"g"],"quinoa":[3.6,0.14,0.64,0.06,"g"]};
+var SEED_RECETAS = [
+ {
+  "nombre": "Tortilla y tostadas",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Huevos",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Claras de huevo",
+    "cantidad": 150,
+    "unidad": "ml",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Pan integral de molde",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Aguacate",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   }
+  ],
+  "pasos": "(Sartén)\nBate los huevos con las claras y salpimenta.\nCuaja en sartén antiadherente a fuego medio, 3-4 min sin dejar que se seque.\nTuesta el pan y añade el aguacate en láminas.",
+  "grupo": "Desayuno"
+ },
+ {
+  "nombre": "Porridge de avena",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Avena",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Claras de huevo",
+    "cantidad": 150,
+    "unidad": "ml",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Fruta (piezas)",
+    "cantidad": 1,
+    "unidad": "ud",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Mantequilla de cacahuete",
+    "cantidad": 15,
+    "unidad": "g",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Microondas)\nMezcla la avena con las claras y un chorro de agua en un bol grande.\nMicroondas 2 min; remueve a mitad para que no rebose.\nAñade la fruta troceada y la mantequilla de cacahuete por encima.",
+  "grupo": "Desayuno"
+ },
+ {
+  "nombre": "Yogur con fruta y tortas",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Yogur proteico 0%",
+    "cantidad": 150,
+    "unidad": "ml",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Frutos rojos",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Tortas de arroz",
+    "cantidad": 3,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Almendras",
+    "cantidad": 20,
+    "unidad": "g",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sin cocinar)\nPon el yogur en un bol con los frutos rojos.\nAñade las almendras troceadas.\nAcompaña con las tortas de arroz.",
+  "grupo": "Desayuno"
+ },
+ {
+  "nombre": "Tortas con jamón y aguacate",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Jamón york / pavo en lonchas",
+    "cantidad": 80,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Tortas de arroz",
+    "cantidad": 3,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Aguacate",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Fruta (piezas)",
+    "cantidad": 1,
+    "unidad": "ud",
+    "categoria": "Frutas y verduras"
+   }
+  ],
+  "pasos": "(Sin cocinar)\nMachaca el aguacate y úntalo en las tortas de arroz.\nReparte el jamón encima.\nDe postre, la fruta.",
+  "grupo": "Desayuno"
+ },
+ {
+  "nombre": "Revuelto de tofu",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Tofu firme",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Pan integral de molde",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Aguacate",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Tomate triturado",
+    "cantidad": 80,
+    "unidad": "g",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sartén)\nDesmiga el tofu con las manos y saltéalo 4-5 min con cúrcuma y sal.\nAñade el tomate triturado y deja 2 min más.\nSirve con el pan tostada y el aguacate.",
+  "grupo": "Desayuno"
+ },
+ {
+  "nombre": "Tostadas con huevo y tomate",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Huevos",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Claras de huevo",
+    "cantidad": 150,
+    "unidad": "ml",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Pan integral de molde",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Tomate triturado",
+    "cantidad": 100,
+    "unidad": "g",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sartén)\nTuesta el pan y cúbrelo con el tomate triturado y el AOVE.\nHaz los huevos y las claras a la plancha.\nMóntalo encima y salpimenta.",
+  "grupo": "Desayuno"
+ },
+ {
+  "nombre": "Requesón con avena y fruta",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Requesón",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Avena",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Fruta (piezas)",
+    "cantidad": 1,
+    "unidad": "ud",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Almendras",
+    "cantidad": 20,
+    "unidad": "g",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sin cocinar)\nMezcla el requesón con la avena y canela.\nAñade la fruta troceada y las almendras.\nMejor si lo dejas en la nevera desde la noche anterior.",
+  "grupo": "Desayuno"
+ },
+ {
+  "nombre": "Batido y tortas de arroz",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Yogur proteico 0%",
+    "cantidad": 150,
+    "unidad": "ml",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Frutos rojos",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Tortas de arroz",
+    "cantidad": 3,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Mantequilla de cacahuete",
+    "cantidad": 15,
+    "unidad": "g",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sin cocinar)\nBate el yogur con los frutos rojos y hielo.\nUnta la mantequilla de cacahuete en las tortas de arroz.\nTómalo junto.",
+  "grupo": "Desayuno"
+ },
+ {
+  "nombre": "Pollo al horno con patata",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Pechuga de pollo",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Patata",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Horno)\nHorno a 200°. Trocea la patata y alíñala con el AOVE y especias.\nA los 15 min añade el pollo salpimentado.\nHornea 12-15 min más; cuece la verdura al vapor aparte.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Arroz con ternera y verdura",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Ternera picada magra o filete",
+    "cantidad": 130,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Arroz",
+    "cantidad": 70,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Olla)\nCuece el arroz con el doble de agua y sal.\nSaltea la verdura con el AOVE 4 min y añade la ternera hasta que dore.\nMezcla todo y rectifica de sal.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Tortillas de maíz rellenas",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Pechuga de pavo",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Tortillas de maíz",
+    "cantidad": 3,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Ensalada (tomate, cebolla, lechuga)",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Aguacate",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   }
+  ],
+  "pasos": "(Sartén)\nCorta el pavo en tiras y hazlo a la plancha con pimentón.\nCalienta las tortillas de maíz 20 s por lado.\nRellena con el pavo, la ensalada y el aguacate.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Pasta con atún y tomate",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Atún al natural (latas)",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Pasta integral",
+    "cantidad": 70,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Tomate triturado",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Olla)\nCuece la pasta al dente.\nCalienta el tomate triturado con ajo y el AOVE, añade el atún escurrido.\nMezcla con la pasta y orégano.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Pollo y patata al airfryer",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Pechuga de pollo",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Patata",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Airfryer)\nAirfryer a 190°. la patata en bastones con el AOVE, 8 min.\nAñade el pollo en tiras especiado y 10 min más, agitando a mitad.\nla verdura al vapor o en los últimos 5 min.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Lentejas con arroz y tofu",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Lentejas cocidas (bote)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Tofu firme",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Arroz",
+    "cantidad": 70,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Olla)\nCuece el arroz.\nDora el tofu en dados con el AOVE y sofríe la verdura.\nAñade las lentejas escurridas y un poco de caldo, 8 min.\nSirve con el arroz.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Garbanzos con pollo y quinoa",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Garbanzos cocidos (bote)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Pechuga de pollo",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Quinoa",
+    "cantidad": 70,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Olla)\nEnjuaga la quinoa y cuécela 15 min con el doble de agua.\nSaltea el pollo en tiras con la verdura y el AOVE.\nAñade los garbanzos escurridos, 5 min.\nMezcla con la quinoa.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Quinoa con pavo y verduras",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Pechuga de pavo",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Quinoa",
+    "cantidad": 70,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Olla)\nCuece la quinoa 15 min.\nSaltea el pavo en tiras con el AOVE y especias.\nAñade la verdura 4 min y mezcla.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Arroz con atún y verduras",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Atún al natural (latas)",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Arroz",
+    "cantidad": 70,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Olla)\nCuece el arroz.\nSaltea la verdura con el AOVE y ajo.\nAñade el atún escurrido al final y mezcla.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Salmón con quinoa",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Salmón",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Quinoa",
+    "cantidad": 70,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Horno)\nEnjuaga la quinoa y cuécela 15 min con el doble de agua.\nel salmón al horno 190°, 12-14 min con limón.\nSaltea la verdura con el AOVE.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Garbanzos con huevo y patata",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Garbanzos cocidos (bote)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Huevos",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Requesón",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Patata",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   }
+  ],
+  "pasos": "(Olla)\nCuece la patata en cubos y los huevos 9 min.\nSaltea la verdura con el AOVE y añade los garbanzos escurridos.\nMezcla, corona con el huevo partido y el requesón aparte.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Ternera con boniato al airfryer",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Ternera picada magra o filete",
+    "cantidad": 130,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Boniato",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Ensalada (tomate, cebolla, lechuga)",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Airfryer)\nAirfryer 190°: el boniato en dados con el AOVE, 12 min.\nla ternera a la plancha 2-3 min por lado.\nAcompaña con la ensalada.",
+  "grupo": "Comida"
+ },
+ {
+  "nombre": "Merluza con boniato",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Merluza",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Boniato",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Horno)\nHorno 190°. el boniato en rodajas con el AOVE, 20 min.\nAñade la merluza con ajo y limón, 10-12 min.\nla verdura al vapor.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Burger de ternera y ensalada",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Ternera picada magra o filete",
+    "cantidad": 130,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Pan integral de molde",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Ensalada (tomate, cebolla, lechuga)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Salsas 0% (ketchup, BBQ)",
+    "cantidad": 1,
+    "unidad": "ud",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sartén)\nForma la burger con la ternera, sal y pimienta.\nPlancha fuerte 2-3 min por lado.\nMonta con el pan, la ensalada y la salsa.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Fajitas de pollo",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Pechuga de pollo",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Fajitas integrales",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Queso sin lactosa",
+    "cantidad": 30,
+    "unidad": "g",
+    "categoria": "Lácteos y huevos"
+   }
+  ],
+  "pasos": "(Sartén)\nSaltea el pollo en tiras con la verdura y especias tex-mex.\nCalienta las fajitas.\nRellena y añade el queso.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Salmón con patata al airfryer",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Salmón",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Patata",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Ensalada (tomate, cebolla, lechuga)",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   }
+  ],
+  "pasos": "(Airfryer)\nAirfryer 190°: la patata en gajos, 12 min.\nAñade el salmón y 8-9 min más.\nSirve con la ensalada y limón.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Revuelto con requesón",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Huevos",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Requesón",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Pan integral de molde",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Aguacate",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   }
+  ],
+  "pasos": "(Sartén)\nBate los huevos y cuájalo removiendo, que quede jugoso.\nRetira del fuego y mezcla el requesón.\nSirve con el pan y el aguacate.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Tofu salteado con arroz",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Tofu firme",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Arroz",
+    "cantidad": 70,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sartén)\nCuece el arroz.\nDora el tofu en dados con el AOVE hasta que quede crujiente.\nAñade la verdura y salsa de soja; mezcla con el arroz.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Pavo a la plancha con patata",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Pechuga de pavo",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Patata",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sartén)\nCuece o microondas la patata 6 min.\nel pavo a la plancha con el AOVE, 3 min por lado.\nSaltea la verdura en la misma sartén.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Ensalada de garbanzos y atún",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Garbanzos cocidos (bote)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Atún al natural (latas)",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Pan integral de molde",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Ensalada (tomate, cebolla, lechuga)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sin cocinar)\nEscurre los garbanzos y el atún.\nPica la ensalada y mézclalo todo con el AOVE y limón.\nAcompaña con el pan tostada.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Bowl de quinoa y pollo",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Pechuga de pollo",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Quinoa",
+    "cantidad": 70,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Verdura (brócoli, calabacín, judías…)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Aguacate",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   }
+  ],
+  "pasos": "(Olla)\nCuece la quinoa 15 min.\nHaz el pollo a la plancha y trocéalo.\nMonta el bowl con la verdura y el aguacate en láminas.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Lentejas con verduras y huevo",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Lentejas cocidas (bote)",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Huevos",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Tofu firme",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Arroz",
+    "cantidad": 70,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Olla)\nCuece el arroz y los huevos 9 min.\nSofríe el tofu en dados con el AOVE.\nAñade las lentejas con un poco de caldo, 8 min.\nSirve con el arroz y el huevo partido.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Tortilla de patata",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Huevos",
+    "cantidad": 2,
+    "unidad": "ud",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Claras de huevo",
+    "cantidad": 150,
+    "unidad": "ml",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Patata",
+    "cantidad": 200,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "AOVE",
+    "cantidad": 10,
+    "unidad": "ml",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sartén)\nCorta la patata fina y hazla en el AOVE a fuego suave, 12 min.\nBate los huevos con las claras, mezcla y cuaja 3 min por lado.\nReposa 5 min antes de cortar.",
+  "grupo": "Cena"
+ },
+ {
+  "nombre": "Yogur con fruta y frutos secos",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Yogur proteico 0%",
+    "cantidad": 150,
+    "unidad": "ml",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Fruta (piezas)",
+    "cantidad": 1,
+    "unidad": "ud",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Almendras",
+    "cantidad": 20,
+    "unidad": "g",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sin cocinar)\nMezcla el yogur con la fruta troceada.\nAñade las almendras.",
+  "grupo": "Snack"
+ },
+ {
+  "nombre": "Tortas con jamón",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Jamón york / pavo en lonchas",
+    "cantidad": 80,
+    "unidad": "g",
+    "categoria": "Carne y pescado"
+   },
+   {
+    "nombre": "Tortas de arroz",
+    "cantidad": 3,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Aguacate",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   }
+  ],
+  "pasos": "(Sin cocinar)\nUnta el aguacate en las tortas de arroz.\nReparte el jamón encima.",
+  "grupo": "Snack"
+ },
+ {
+  "nombre": "Requesón con avena",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Requesón",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Avena",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Mantequilla de cacahuete",
+    "cantidad": 15,
+    "unidad": "g",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sin cocinar)\nMezcla el requesón, la avena y la mantequilla de cacahuete.\nCanela por encima.",
+  "grupo": "Snack"
+ },
+ {
+  "nombre": "Batido de frutos rojos",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Yogur proteico 0%",
+    "cantidad": 150,
+    "unidad": "ml",
+    "categoria": "Lácteos y huevos"
+   },
+   {
+    "nombre": "Frutos rojos",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Tortas de arroz",
+    "cantidad": 3,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Mantequilla de cacahuete",
+    "cantidad": 15,
+    "unidad": "g",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sin cocinar)\nBate el yogur con los frutos rojos.\nAcompaña con las tortas de arroz y la mantequilla de cacahuete.",
+  "grupo": "Snack"
+ },
+ {
+  "nombre": "Tortas con aguacate y tomate",
+  "raciones": 1,
+  "ingredientes": [
+   {
+    "nombre": "Tofu firme",
+    "cantidad": 150,
+    "unidad": "g",
+    "categoria": "Despensa"
+   },
+   {
+    "nombre": "Tortas de arroz",
+    "cantidad": 3,
+    "unidad": "ud",
+    "categoria": "Panadería"
+   },
+   {
+    "nombre": "Aguacate",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Frutas y verduras"
+   },
+   {
+    "nombre": "Tomate triturado",
+    "cantidad": 60,
+    "unidad": "g",
+    "categoria": "Despensa"
+   }
+  ],
+  "pasos": "(Sin cocinar)\nMarca el tofu en la sartén o tómalo firme en dados.\nUnta el aguacate y el tomate triturado en las tortas de arroz.\nAñade el tofu.",
+  "grupo": "Snack"
+ }
+];
+
+function normStr(s){return String(s==null?'':s).toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+var toastT;
+function toast(msg){var t=$('toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('on');},2600);}
+function setStatus(txt,cls){ $('dot').className='dot'+(cls?(' '+cls):''); $('synctx').textContent=txt; }
+
+function macrosDeIngs(ings){
+  var t={kcal:0,p:0,c:0,g:0,hay:false};
+  (ings||[]).forEach(function(ing){
+    var m=MACROS[normStr(ing.nombre)]; if(!m) return;
+    var q=parseFloat(String(ing.cantidad).replace(',','.')); if(isNaN(q)) q=0;
+    t.kcal+=m[0]*q; t.p+=m[1]*q; t.c+=m[2]*q; t.g+=m[3]*q; t.hay=true;
+  });
+  t.kcal=Math.round(t.kcal); t.p=Math.round(t.p); t.c=Math.round(t.c); t.g=Math.round(t.g);
+  return t;
+}
+function macroBadge(ings){ var m=macrosDeIngs(ings); if(!m.hay) return ''; return '<span class="macro">🔥 '+m.kcal+' kcal · 💪 '+m.p+'g P</span>'; }
+
+var S = {lista:[],recetas:[],menu:[],favs:[],despensa:[]};
+var slotCtx = null, recQuery='', recFilter='all', editingRec=null, genItems=[];
+var USER = localStorage.getItem('lcr_user')||'';
+
+/* ================= FIREBASE / DATOS ================= */
+var db=null, HID=null, ready=false;
+function getHid(){
+  var m=(location.hash||'').match(/h=([A-Za-z0-9_-]+)/);
+  if(m){ localStorage.setItem('lcr_hid',m[1]); return m[1]; }
+  var saved=localStorage.getItem('lcr_hid');
+  if(saved){ if(location.hash.indexOf('h=')<0) location.hash='h='+saved; return saved; }
+  var id=Math.random().toString(36).slice(2,8)+Math.random().toString(36).slice(2,6);
+  localStorage.setItem('lcr_hid',id); location.hash='h='+id; return id;
+}
+function hcol(name){ return db.collection('households').doc(HID).collection(name); }
+
+function initFirebase(){
+  if(!FIREBASE_CONFIG.apiKey){
+    $('cfg-warn').innerHTML='<div class="banner">⚙️ Falta configurar Firebase. Pega tu <b>firebaseConfig</b> en el código y vuelve a publicar.</div>';
+    setStatus('Sin configurar','off'); return;
+  }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db=firebase.firestore();
+  try{ db.enablePersistence({synchronizeTabs:true}).catch(function(){}); }catch(e){}
+  HID=getHid();
+  firebase.auth().signInAnonymously().catch(function(e){
+    setStatus('Error de acceso','off');
+    $('cfg-warn').innerHTML='<div class="banner">No se pudo entrar. Activa <b>Authentication → Anónimo</b> en Firebase.</div>';
+  });
+  firebase.auth().onAuthStateChanged(function(u){ if(u && !ready){ ready=true; startListeners(); } });
+}
+function mapDocs(s){ return s.docs.map(function(d){ var o=d.data()||{}; o.id=d.id; return o; }); }
+function startListeners(){
+  setStatus('Sincronizado','');
+  hcol('items').onSnapshot(function(s){ S.lista=mapDocs(s); afterData(); }, errSnap);
+  hcol('recipes').onSnapshot(function(s){ S.recetas=mapDocs(s); S.favs=S.recetas.filter(function(r){return r.fav;}).map(function(r){return r.id;}); maybeSeed(); afterData(); }, errSnap);
+  hcol('menu').onSnapshot(function(s){ S.menu=mapDocs(s); afterData(); }, errSnap);
+  hcol('pantry').onSnapshot(function(s){ S.despensa=mapDocs(s); afterData(); }, errSnap);
+}
+function errSnap(e){ setStatus('Sin conexión','off'); }
+function afterData(){
+  if(navigator.onLine!==false) setStatus('Sincronizado','');
+  render();
+  try{ localStorage.setItem('lcr_state',JSON.stringify(S)); }catch(e){}
+}
+function maybeSeed(){
+  if(S.recetas.length) return;
+  if(localStorage.getItem('lcr_seeded_'+HID)) return;
+  localStorage.setItem('lcr_seeded_'+HID,'1');
+  fbSeed();
+}
+function fbSeed(){
+  var b=db.batch();
+  SEED_RECETAS.forEach(function(r){
+    var ref=hcol('recipes').doc();
+    b.set(ref,{nombre:r.nombre,grupo:r.grupo||'',raciones:r.raciones||1,ingredientes:r.ingredientes||[],pasos:r.pasos||'',fav:false,creado:Date.now()});
+  });
+  return b.commit();
+}
+
+/* mutaciones */
+function fbAddItem(it){ return hcol('items').add({nombre:it.nombre,cantidad:it.cantidad||'',unidad:it.unidad||'',categoria:it.categoria||'Otros',comprado:false,addedBy:USER||'',boughtBy:'',creado:Date.now()}); }
+function fbToggleItem(id,comprado){ return hcol('items').doc(id).update({comprado:!!comprado, boughtBy: comprado?(USER||''):''}); }
+function fbDeleteItem(id){ return hcol('items').doc(id).delete(); }
+function fbClearComprados(){ var b=db.batch(); S.lista.filter(function(i){return i.comprado;}).forEach(function(i){ b.delete(hcol('items').doc(i.id)); }); return b.commit(); }
+function fbSaveRecipe(rec){ var data={nombre:rec.nombre,grupo:rec.grupo||'',raciones:Number(rec.raciones)||1,ingredientes:rec.ingredientes||[],pasos:rec.pasos||''};
+  if(rec.id){ return hcol('recipes').doc(rec.id).update(data); }
+  data.fav=false; data.creado=Date.now(); return hcol('recipes').add(data); }
+function fbDeleteRecipe(id){ var b=db.batch(); b.delete(hcol('recipes').doc(id));
+  S.menu.filter(function(m){return String(m.recetaId)===String(id);}).forEach(function(m){ b.delete(hcol('menu').doc(m.id)); }); return b.commit(); }
+function fbToggleFav(id){ var r=S.recetas.filter(function(x){return x.id===id;})[0]; return hcol('recipes').doc(id).update({fav: !(r&&r.fav)}); }
+function fbAddDespensa(n,cat){ if(S.despensa.some(function(x){return normStr(x.nombre)===normStr(n);})) return Promise.resolve(); return hcol('pantry').add({nombre:n,categoria:cat||'Otros'}); }
+function fbRemoveDespensa(nombre){ var d=S.despensa.filter(function(x){return normStr(x.nombre)===normStr(nombre);})[0]; return d?hcol('pantry').doc(d.id).delete():Promise.resolve(); }
+function fbSetMenu(dia,momento,recetaId,raciones){ var docId=dia+'__'+momento;
+  if(!recetaId){ return hcol('menu').doc(docId).delete(); }
+  return hcol('menu').doc(docId).set({dia:dia,momento:momento,recetaId:recetaId,raciones:Number(raciones)||0}); }
+function fbClearMenu(){ var b=db.batch(); S.menu.forEach(function(m){ b.delete(hcol('menu').doc(m.id)); }); return b.commit(); }
+function fbAddItems(items){ var b=db.batch(); var pres={}; S.lista.forEach(function(i){pres[normStr(i.nombre)]=true;});
+  (items||[]).forEach(function(it){ if(!it.nombre||pres[normStr(it.nombre)]) return; var ref=hcol('items').doc();
+    b.set(ref,{nombre:it.nombre,cantidad:it.cantidad||'',unidad:it.unidad||'',categoria:it.categoria||'Otros',comprado:false,addedBy:USER||'',boughtBy:'',creado:Date.now()}); pres[normStr(it.nombre)]=true; });
+  return b.commit(); }
+
+/* cálculo del menú (cliente) */
+function aggMenu(){
+  var recById={}; S.recetas.forEach(function(r){recById[r.id]=r;});
+  var agg={};
+  S.menu.forEach(function(m){ var rec=recById[m.recetaId]; if(!rec)return; var factor=(m.raciones&&rec.raciones)?(m.raciones/rec.raciones):1;
+    (rec.ingredientes||[]).forEach(function(ing){ var nombre=ing.nombre||''; if(!nombre)return; var unidad=ing.unidad||'';
+      var key=normStr(nombre)+'|'+normStr(unidad); var qty=parseFloat(String(ing.cantidad).replace(',','.')); if(isNaN(qty))qty=null;
+      var add=(qty!=null)?qty*factor:null;
+      if(!agg[key]){agg[key]={nombre:nombre,cantidad:add,unidad:unidad,categoria:ing.categoria||'Otros'};}
+      else if(add!=null){agg[key].cantidad=(agg[key].cantidad||0)+add;} }); });
+  return agg;
+}
+function menuNeeds(){ var agg=aggMenu(); var enL={};S.lista.forEach(function(i){enL[normStr(i.nombre)]=true;}); var enD={};(S.despensa||[]).forEach(function(d){enD[normStr(d.nombre)]=true;});
+  return Object.keys(agg).map(function(k){var a=agg[k];return {nombre:a.nombre,cantidad:(a.cantidad!=null)?Math.round(a.cantidad*100)/100:'',unidad:a.unidad,categoria:a.categoria,enLista:!!enL[normStr(a.nombre)],enDespensa:!!enD[normStr(a.nombre)]};})
+    .sort(function(a,b){return a.categoria.localeCompare(b.categoria);}); }
+function addRecipeToList(recetaId,raciones){ var rec=S.recetas.filter(function(r){return String(r.id)===String(recetaId);})[0];
+  if(!rec) return Promise.resolve({added:[],skipped:[]});
+  var factor=(raciones&&rec.raciones)?(Number(raciones)/rec.raciones):1;
+  var enL={};S.lista.forEach(function(i){enL[normStr(i.nombre)]=true;});
+  var items=[],added=[],skipped=[];
+  (rec.ingredientes||[]).forEach(function(ing){ var nombre=ing.nombre||''; if(!nombre)return; if(enL[normStr(nombre)]){skipped.push(nombre);return;}
+    var qty=parseFloat(String(ing.cantidad).replace(',','.')); var cant=isNaN(qty)?'':Math.round(qty*factor*100)/100;
+    items.push({nombre:nombre,cantidad:cant,unidad:ing.unidad||'',categoria:ing.categoria||'Otros'}); enL[normStr(nombre)]=true; added.push(nombre); });
+  return fbAddItems(items).then(function(){return {added:added,skipped:skipped};}); }
+
+/* ================= RENDER ================= */
+function render(){ renderLista(); renderRecetas(); renderMenu(); renderDatalist(); renderDespensa(); }
+function renderLista(){
+  var body=$('lista-body');
+  if(!S.lista.length){ body.innerHTML='<div class="empty-state"><div class="big">🛒</div>Lista vacía.<br>Añade lo que falte en casa.</div>'; return; }
+  var pend=S.lista.filter(function(i){return !i.comprado;});
+  var done=S.lista.filter(function(i){return i.comprado;});
+  var html='';
+  var order={}; CATS.forEach(function(c,i){order[c[0]]=i;});
+  var groups={};
+  pend.forEach(function(it){var k=it.categoria||'Otros';(groups[k]=groups[k]||[]).push(it);});
+  Object.keys(groups).sort(function(a,b){return (order[a]==null?99:order[a])-(order[b]==null?99:order[b]);})
+    .forEach(function(cat){
+      html+='<div class="cat">'+(CAT_EMOJI[cat]||'📦')+' '+esc(cat)+'</div><div class="card">';
+      groups[cat].forEach(function(it){ html+=itemHTML(it); });
+      html+='</div>';
+    });
+  if(done.length){
+    html+='<div class="cat">✅ Comprado ('+done.length+')</div><div class="card">';
+    done.forEach(function(it){ html+=itemHTML(it); });
+    html+='</div>';
+  }
+  body.innerHTML=html;
+}
+function itemHTML(it){
+  var qty=[it.cantidad,it.unidad].filter(Boolean).join(' ');
+  var who = it.comprado ? (it.boughtBy?('✓ '+esc(it.boughtBy)):'') : (it.addedBy?('+ '+esc(it.addedBy)):'');
+  var sub=[qty?esc(qty):'', who].filter(Boolean).join(' · ');
+  return '<div class="item'+(it.comprado?' done':'')+'" data-id="'+it.id+'">'+
+    '<div class="check" data-act="toggle"><svg width="13" height="13" viewBox="0 0 13 13"><path d="M2 7l3 3 6-7" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
+    '<div class="it-main"><div class="it-name">'+esc(it.nombre)+'</div>'+(sub?'<div class="it-sub">'+sub+'</div>':'')+'</div>'+
+    '<button class="x" data-act="del">×</button></div>';
+}
+function isFav(id){ return (S.favs||[]).indexOf(id)>-1; }
+function recCardHTML(r){
+  var chips=(r.ingredientes||[]).map(function(g){
+    var q=[g.cantidad,g.unidad].filter(function(x){return x!==''&&x!=null;}).join(' ');
+    return '<span class="ing-chip">'+esc(g.nombre)+(q?' · '+esc(q):'')+'</span>';
+  }).join('');
+  var mb=macroBadge(r.ingredientes);
+  return '<div class="card rec" data-id="'+r.id+'">'+
+    '<button class="star'+(isFav(r.id)?' on':'')+'" data-act="fav">'+(isFav(r.id)?'⭐':'☆')+'</button>'+
+    '<h3 style="padding-right:28px">'+esc(r.nombre)+'</h3>'+
+    '<div class="meta">'+r.raciones+' rac. · '+(r.ingredientes||[]).length+' ingredientes '+mb+'</div>'+
+    '<div>'+chips+'</div>'+
+    '<div class="rec-actions" style="margin-top:11px">'+
+      '<button class="btn sm" data-act="addlist">+ A la lista</button>'+
+      '<button class="btn ghost sm" data-act="edit">Editar</button>'+
+    '</div></div>';
+}
+function recMatch(r){
+  if(recFilter==='fav' && !isFav(r.id)) return false;
+  if(recFilter!=='all' && recFilter!=='fav' && (r.grupo||'Otro')!==recFilter) return false;
+  if(recQuery){ var q=normStr(recQuery);
+    var inName=normStr(r.nombre).indexOf(q)>-1;
+    var inIng=(r.ingredientes||[]).some(function(g){return normStr(g.nombre).indexOf(q)>-1;});
+    if(!inName && !inIng) return false; }
+  return true;
+}
+function renderFilters(){
+  var el=$('r-filters');
+  var opts=[['all','Todas'],['fav','⭐ Favoritas']].concat(GRUPOS.map(function(g){return [g[0],g[1]+' '+g[0]];}));
+  el.innerHTML=opts.map(function(o){return '<button class="chip'+(recFilter===o[0]?' on':'')+'" data-f="'+o[0]+'">'+esc(o[1])+'</button>';}).join('');
+}
+function renderRecetas(){
+  renderFilters();
+  var body=$('recetas-body');
+  if(!S.recetas.length){ body.innerHTML='<div class="empty-state"><div class="big">📖</div>Sin recetas todavía.<br>Crea una o pulsa 📥.</div>'; return; }
+  var list=S.recetas.filter(recMatch);
+  if(!list.length){ body.innerHTML='<div class="empty-state">Nada coincide con el filtro.</div>'; return; }
+  var groups={};
+  list.forEach(function(r){ var g=r.grupo||'Otro'; (groups[g]=groups[g]||[]).push(r); });
+  var keys=Object.keys(groups).sort(function(a,b){return (GRUPO_ORD[a]==null?99:GRUPO_ORD[a])-(GRUPO_ORD[b]==null?99:GRUPO_ORD[b]);});
+  body.innerHTML=keys.map(function(g){
+    return '<div class="cat">'+(GRUPO_EMOJI[g]||'🍴')+' '+esc(g)+' ('+groups[g].length+')</div>'+
+      groups[g].map(recCardHTML).join('');
+  }).join('');
+}
+function scaledMacros(rec, slotRac){
+  var factor=(slotRac&&rec.raciones)?(slotRac/rec.raciones):1;
+  var m=macrosDeIngs(rec.ingredientes);
+  return {kcal:Math.round(m.kcal*factor), p:Math.round(m.p*factor), hay:m.hay};
+}
+function renderMenu(){
+  var body=$('menu-body');
+  var byKey={}; S.menu.forEach(function(m){byKey[m.dia+'|'+m.momento]=m;});
+  var recById={}; S.recetas.forEach(function(r){recById[r.id]=r;});
+  var wk={kcal:0,p:0,hay:false};
+  var html=DIAS.map(function(d){
+    var dk=0,dp=0,dhay=false;
+    var slots=MOMENTOS.map(function(mo){
+      var m=byKey[d+'|'+mo];
+      var rec=m?recById[m.recetaId]:null;
+      if(rec){ var sm=scaledMacros(rec,m.raciones); if(sm.hay){dk+=sm.kcal;dp+=sm.p;dhay=true;wk.kcal+=sm.kcal;wk.p+=sm.p;wk.hay=true;} }
+      var val=rec?esc(rec.nombre):'+ añadir';
+      return '<div class="card slot'+(rec?'':' empty')+'" data-dia="'+esc(d)+'" data-mom="'+mo+'">'+
+        '<div class="lbl">'+mo+'</div><div class="val">'+val+'</div></div>';
+    }).join('');
+    var ds=dhay?'<span class="day-sum">· '+dk+' kcal · '+dp+'g P</span>':'';
+    return '<div class="day"><h3>'+esc(d)+ds+'</h3><div class="slots">'+slots+'</div></div>';
+  }).join('');
+  var sum=wk.hay?'<div class="menu-sum">Semana: <b>'+wk.kcal+' kcal</b> · '+wk.p+'g proteína ('+Math.round(wk.kcal/7)+' kcal/día aprox.)</div>':'';
+  body.innerHTML=sum+html;
+}
+function renderDatalist(){
+  var names={};
+  S.recetas.forEach(function(r){(r.ingredientes||[]).forEach(function(g){if(g.nombre)names[g.nombre]=1;});});
+  S.lista.forEach(function(it){if(it.nombre)names[it.nombre]=1;});
+  (S.despensa||[]).forEach(function(d){if(d.nombre)names[d.nombre]=1;});
+  $('prod-list').innerHTML=Object.keys(names).sort().map(function(n){return '<option value="'+esc(n)+'">';}).join('');
+}
+function renderDespensa(){
+  var el=$('desp-list'); if(!el) return;
+  var d=S.despensa||[];
+  if(!d.length){ el.innerHTML='<div class="empty-state" style="padding:16px;color:var(--muted)">Vacía. Añade lo que siempre tienes (sal, aceite, especias…).</div>'; return; }
+  el.innerHTML='<div class="card">'+d.map(function(x){
+    return '<div class="item"><div class="it-main"><div class="it-name">'+esc(x.nombre)+'</div></div>'+
+      '<button class="x" data-desp="'+esc(x.nombre)+'">×</button></div>';
+  }).join('')+'</div>';
+}
+
+/* ================= EVENTOS ================= */
+function fillCats(sel){ sel.innerHTML=CATS.map(function(c){return '<option value="'+c[0]+'">'+c[1]+' '+c[0]+'</option>';}).join(''); }
+fillCats($('l-cat'));
+$('rec-grupo').innerHTML=GRUPOS.map(function(g){return '<option value="'+g[0]+'">'+g[1]+' '+g[0]+'</option>';}).join('');
+
+$('l-add').addEventListener('click', addItem);
+$('l-nombre').addEventListener('keydown', function(e){ if(e.key==='Enter') addItem(); });
+function addItem(){
+  var n=$('l-nombre').value.trim(); if(!n||!db) return;
+  var it={nombre:n, cantidad:$('l-cant').value.trim(), unidad:$('l-unid').value.trim(), categoria:$('l-cat').value};
+  $('l-nombre').value='';$('l-cant').value='';$('l-unid').value='';$('l-nombre').focus();
+  fbAddItem(it);
+}
+$('lista-body').addEventListener('click', function(e){
+  var item=e.target.closest('.item'); if(!item||!db) return;
+  var id=item.getAttribute('data-id');
+  var act=e.target.closest('[data-act]'); if(!act) return;
+  if(act.getAttribute('data-act')==='toggle'){
+    var cur=S.lista.filter(function(i){return i.id===id;})[0];
+    fbToggleItem(id, cur?!cur.comprado:true);
+  }else if(act.getAttribute('data-act')==='del'){ fbDeleteItem(id); }
+});
+$('l-clear').addEventListener('click', function(){
+  if(!db||!S.lista.some(function(i){return i.comprado;})) return;
+  fbClearComprados().then(function(){toast('Comprados vaciados');});
+});
+$('l-desp').addEventListener('click', function(){ $('ov-desp').classList.add('on'); });
+$('l-wa').addEventListener('click', function(){
+  var pend=S.lista.filter(function(i){return !i.comprado;});
+  if(!pend.length){ toast('No hay nada pendiente'); return; }
+  var order={}; CATS.forEach(function(c,i){order[c[0]]=i;});
+  var groups={}; pend.forEach(function(it){(groups[it.categoria]=groups[it.categoria]||[]).push(it);});
+  var lines=['🛒 *Lista de la compra*',''];
+  Object.keys(groups).sort(function(a,b){return (order[a]==null?99:order[a])-(order[b]==null?99:order[b]);}).forEach(function(cat){
+    lines.push((CAT_EMOJI[cat]||'📦')+' *'+cat+'*');
+    groups[cat].forEach(function(it){ var q=[it.cantidad,it.unidad].filter(Boolean).join(' '); lines.push('• '+it.nombre+(q?' ('+q+')':'')); });
+    lines.push('');
+  });
+  window.open('https://wa.me/?text='+encodeURIComponent(lines.join('\n')),'_blank');
+});
+
+$('r-new').addEventListener('click', function(){ openRec(null); });
+$('r-seed').addEventListener('click', function(){ if(!db)return; fbSeed().then(function(){toast('Recetas Plan Fit cargadas');}); });
+$('r-search').addEventListener('input', function(){ recQuery=this.value; renderRecetas(); });
+$('r-filters').addEventListener('click', function(e){ var c=e.target.closest('[data-f]'); if(!c) return; recFilter=c.getAttribute('data-f'); renderRecetas(); });
+$('r-rand').addEventListener('click', function(){
+  var pool=S.recetas.filter(recMatch); if(!pool.length){ toast('No hay recetas'); return; }
+  var r=pool[Math.floor(Math.random()*pool.length)]; openRec(r); toast('🎲 '+r.nombre);
+});
+$('recetas-body').addEventListener('click', function(e){
+  var card=e.target.closest('.rec'); if(!card||!db) return;
+  var id=card.getAttribute('data-id');
+  var rec=S.recetas.filter(function(r){return r.id===id;})[0];
+  var act=e.target.closest('[data-act]'); if(!act||!rec) return;
+  if(act.getAttribute('data-act')==='fav'){ fbToggleFav(rec.id); }
+  else if(act.getAttribute('data-act')==='edit') openRec(rec);
+  else if(act.getAttribute('data-act')==='addlist'){
+    addRecipeToList(rec.id,rec.raciones).then(function(r){
+      toast(r.added.length?('Añadidos '+r.added.length+(r.skipped.length?' · '+r.skipped.length+' ya los tenías':'')):'Ya tenías todo 👍');
+    });
+  }
+});
+function ingRowHTML(g){
+  g=g||{};
+  return '<div class="ingrow" data-cat="'+esc(g.categoria||'Otros')+'">'+
+    '<input class="ig-n" placeholder="Ingrediente" value="'+esc(g.nombre||'')+'">'+
+    '<input class="ig-c" placeholder="Cant." inputmode="decimal" value="'+esc(g.cantidad||'')+'">'+
+    '<input class="ig-u" placeholder="g" value="'+esc(g.unidad||'')+'">'+
+    '<button class="x" data-act="rmv">×</button></div>';
+}
+function openRec(rec){
+  editingRec=rec;
+  $('rec-title').textContent=rec?'Editar receta':'Nueva receta';
+  $('rec-nombre').value=rec?rec.nombre:'';
+  $('rec-grupo').value=(rec&&rec.grupo)?rec.grupo:'Comida';
+  $('rec-rac').value=rec?rec.raciones:2;
+  $('rec-pasos').value=rec?rec.pasos:'';
+  var ings=rec&&rec.ingredientes&&rec.ingredientes.length?rec.ingredientes:[{}];
+  $('rec-ings').innerHTML=ings.map(ingRowHTML).join('');
+  $('rec-del').style.display=rec?'':'none';
+  $('ov-rec').classList.add('on');
+}
+$('rec-adding').addEventListener('click', function(){ $('rec-ings').insertAdjacentHTML('beforeend', ingRowHTML({})); });
+$('rec-ings').addEventListener('click', function(e){
+  if(e.target.closest('[data-act="rmv"]')){ var r=e.target.closest('.ingrow'); if($('rec-ings').children.length>1) r.remove(); }
+});
+$('rec-cancel').addEventListener('click', function(){ $('ov-rec').classList.remove('on'); });
+$('rec-save').addEventListener('click', function(){
+  if(!db)return;
+  var nombre=$('rec-nombre').value.trim(); if(!nombre){ $('rec-nombre').focus(); return; }
+  var ings=[];
+  Array.prototype.forEach.call($('rec-ings').children,function(row){
+    var n=row.querySelector('.ig-n').value.trim(); if(!n) return;
+    ings.push({nombre:n, cantidad:row.querySelector('.ig-c').value.trim(), unidad:row.querySelector('.ig-u').value.trim(), categoria:row.getAttribute('data-cat')||'Otros'});
+  });
+  var rec={id:editingRec?editingRec.id:'', nombre:nombre, grupo:$('rec-grupo').value, raciones:Number($('rec-rac').value)||1, ingredientes:ings, pasos:$('rec-pasos').value.trim()};
+  $('ov-rec').classList.remove('on');
+  fbSaveRecipe(rec).then(function(){toast('Receta guardada');});
+});
+$('rec-del').addEventListener('click', function(){
+  if(!editingRec||!db) return;
+  $('ov-rec').classList.remove('on');
+  fbDeleteRecipe(editingRec.id).then(function(){toast('Receta eliminada');});
+});
+
+$('menu-body').addEventListener('click', function(e){
+  var slot=e.target.closest('.slot'); if(!slot) return;
+  openSlot(slot.getAttribute('data-dia'), slot.getAttribute('data-mom'));
+});
+function openSlot(dia,mom){
+  slotCtx={dia:dia,momento:mom};
+  var cur=S.menu.filter(function(m){return m.dia===dia&&m.momento===mom;})[0];
+  $('slot-title').textContent=dia+' · '+mom;
+  if(!S.recetas.length){
+    $('slot-list').innerHTML='<div class="empty-state" style="padding:20px">Primero crea recetas en la pestaña 📖</div>';
+    $('slot-rac').value='';
+  }else{
+    $('slot-rac').value=cur&&cur.raciones?cur.raciones:'';
+    $('slot-list').innerHTML=S.recetas.map(function(r){
+      var on=cur&&cur.recetaId===r.id;
+      return '<button class="btn '+(on?'':'ghost')+' wide" data-rid="'+r.id+'" data-rac="'+r.raciones+'" style="margin-bottom:8px;justify-content:space-between">'+
+        '<span>'+esc(r.nombre)+'</span><span style="font-size:13px;opacity:.7">'+r.raciones+' rac.</span></button>';
+    }).join('');
+  }
+  $('slot-remove').style.display=cur?'':'none';
+  $('ov-slot').classList.add('on');
+}
+$('slot-list').addEventListener('click', function(e){
+  var b=e.target.closest('[data-rid]'); if(!b||!slotCtx||!db) return;
+  var rac=Number($('slot-rac').value)||Number(b.getAttribute('data-rac'))||0;
+  $('ov-slot').classList.remove('on');
+  fbSetMenu(slotCtx.dia,slotCtx.momento,b.getAttribute('data-rid'),rac);
+});
+$('slot-remove').addEventListener('click', function(){
+  if(!slotCtx||!db) return;
+  $('ov-slot').classList.remove('on');
+  fbSetMenu(slotCtx.dia,slotCtx.momento,'',0);
+});
+$('slot-cancel').addEventListener('click', function(){ $('ov-slot').classList.remove('on'); });
+
+$('m-gen').addEventListener('click', function(){
+  if(!S.menu.length){ toast('Asigna recetas al menú primero'); return; }
+  genItems=menuNeeds().map(function(it){ it.sel=!(it.enLista||it.enDespensa); return it; });
+  renderGen(); $('ov-gen').classList.add('on');
+});
+function renderGen(){
+  if(!genItems.length){ $('gen-list').innerHTML='<div class="empty-state" style="padding:20px">El menú no tiene ingredientes.</div>'; return; }
+  var order={}; CATS.forEach(function(c,i){order[c[0]]=i;});
+  var groups={}; genItems.forEach(function(it,idx){ it._i=idx; (groups[it.categoria]=groups[it.categoria]||[]).push(it); });
+  var keys=Object.keys(groups).sort(function(a,b){return (order[a]==null?99:order[a])-(order[b]==null?99:order[b]);});
+  $('gen-list').innerHTML=keys.map(function(cat){
+    return '<div class="cat">'+(CAT_EMOJI[cat]||'📦')+' '+esc(cat)+'</div>'+
+      groups[cat].map(function(it){
+        var q=[it.cantidad,it.unidad].filter(function(x){return x!==''&&x!=null;}).join(' ');
+        var tag=it.enLista?'ya en lista':(it.enDespensa?'en despensa':'');
+        return '<div class="pv-item'+(it.sel?' sel':'')+(tag?' have':'')+'" data-i="'+it._i+'">'+
+          '<div class="pv-cb"><svg width="12" height="12" viewBox="0 0 13 13"><path d="M2 7l3 3 6-7" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
+          '<div class="pv-main"><div>'+esc(it.nombre)+(q?' <span class="pv-tag">· '+esc(q)+'</span>':'')+'</div>'+(tag?'<div class="pv-tag">'+tag+'</div>':'')+'</div></div>';
+      }).join('');
+  }).join('');
+}
+$('gen-list').addEventListener('click', function(e){
+  var row=e.target.closest('.pv-item'); if(!row) return;
+  var it=genItems[+row.getAttribute('data-i')]; it.sel=!it.sel; row.classList.toggle('sel',it.sel);
+});
+$('gen-add').addEventListener('click', function(){
+  var sel=genItems.filter(function(it){return it.sel;}).map(function(it){return {nombre:it.nombre,cantidad:it.cantidad,unidad:it.unidad,categoria:it.categoria};});
+  $('ov-gen').classList.remove('on');
+  if(!sel.length){ toast('No marcaste nada'); return; }
+  fbAddItems(sel).then(function(){ toast('✅ '+sel.length+' productos a la lista'); switchView('lista'); });
+});
+$('gen-cancel').addEventListener('click', function(){ $('ov-gen').classList.remove('on'); });
+
+$('desp-cancel').addEventListener('click', function(){ $('ov-desp').classList.remove('on'); });
+$('desp-add').addEventListener('click', function(){
+  var n=$('desp-nombre').value.trim(); if(!n||!db) return; $('desp-nombre').value=''; fbAddDespensa(n,'Otros');
+});
+$('desp-nombre').addEventListener('keydown', function(e){ if(e.key==='Enter') $('desp-add').click(); });
+$('desp-list').addEventListener('click', function(e){
+  var b=e.target.closest('[data-desp]'); if(!b||!db) return; fbRemoveDespensa(b.getAttribute('data-desp'));
+});
+$('m-clear').addEventListener('click', function(){ if(!db||!S.menu.length) return; fbClearMenu().then(function(){toast('Menú vaciado');}); });
+
+['ov-rec','ov-slot','ov-gen','ov-desp','ov-name'].forEach(function(id){ $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); }); });
+
+/* identidad */
+function refreshWho(){ $('who').textContent='👤 '+(USER||'yo'); }
+$('who').addEventListener('click', function(){ $('name-input').value=USER; $('ov-name').classList.add('on'); setTimeout(function(){$('name-input').focus();},100); });
+$('name-save').addEventListener('click', function(){ var n=$('name-input').value.trim(); if(!n) return; USER=n; localStorage.setItem('lcr_user',n); refreshWho(); $('ov-name').classList.remove('on'); });
+$('name-input').addEventListener('keydown', function(e){ if(e.key==='Enter') $('name-save').click(); });
+
+/* invitar */
+$('invite').addEventListener('click', function(){
+  var url=location.origin+location.pathname+'#h='+(HID||localStorage.getItem('lcr_hid')||'');
+  var text='Únete a nuestra lista de la compra 🛒🍽️\n'+url;
+  if(navigator.share){ navigator.share({title:'Lista & Recetas',text:text,url:url}).catch(function(){}); }
+  else if(navigator.clipboard){ navigator.clipboard.writeText(url).then(function(){toast('Enlace copiado');}); }
+  else { window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank'); }
+});
+
+/* nav */
+var TITLES={lista:'🛒 Lista de la compra',recetas:'📖 Recetas',menu:'🗓️ Menú semanal'};
+function switchView(v){
+  document.querySelectorAll('.view').forEach(function(s){s.classList.toggle('on',s.id==='v-'+v);});
+  document.querySelectorAll('nav button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-v')===v);});
+  $('ttl').textContent=TITLES[v];
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('nav button').forEach(function(b){ b.addEventListener('click',function(){switchView(b.getAttribute('data-v'));}); });
+
+/* arranque */
+refreshWho();
+try{ var c=localStorage.getItem('lcr_state'); if(c){ S=JSON.parse(c); render(); setStatus('Guardado local',''); } }catch(e){}
+if(!USER) $('ov-name').classList.add('on');
+window.addEventListener('offline', function(){ setStatus('Sin conexión (modo offline)','off'); });
+window.addEventListener('online', function(){ setStatus('Sincronizado',''); });
+initFirebase();
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>
