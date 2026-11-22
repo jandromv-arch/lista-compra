@@ -183,6 +183,7 @@
     </div>
     <div id="lista-body"></div>
     <div style="margin-top:18px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="btn ghost sm" id="l-scan">📷 Escanear</button>
       <button class="btn ghost sm" id="l-wa">📲 WhatsApp</button>
       <button class="btn ghost sm" id="l-hab">⭐ Habituales</button>
       <button class="btn ghost sm" id="l-desp">🧺 Despensa</button>
@@ -284,6 +285,17 @@
   </div>
 </div>
 
+<div class="ov" id="ov-scan">
+  <div class="sheet">
+    <h2>📷 Escanear producto</h2>
+    <div style="position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:3/4;max-height:50vh;margin-bottom:10px">
+      <video id="scan-video" playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+    </div>
+    <p id="scan-status" style="font-size:13px;color:var(--muted);text-align:center;margin:0 0 10px">Apunta al código de barras…</p>
+    <button class="btn ghost wide" id="scan-close">Cerrar</button>
+  </div>
+</div>
+
 <div class="ov" id="ov-hab">
   <div class="sheet">
     <h2>⭐ Habituales</h2>
@@ -312,6 +324,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script>
 /* ======= CONFIG FIREBASE (pega aquí tu firebaseConfig) ======= */
 var FIREBASE_CONFIG = {
@@ -2017,6 +2030,61 @@ $('desp-list').addEventListener('click', function(e){
   var b=e.target.closest('[data-desp]'); if(!b||!db) return; fbRemoveDespensa(b.getAttribute('data-desp'));
 });
 $('m-clear').addEventListener('click', function(){ if(!db||!S.menu.length) return; fbClearMenu().then(function(){toast('Menú vaciado');}); });
+
+/* ===== escáner código de barras ===== */
+var scanReader=null, scanStream=null;
+function offCategory(tags){
+  var s=(tags||[]).join(' ');
+  if(/dairy|milk|cheese|yogur|lacte|egg|huevo/i.test(s)) return 'Lácteos y huevos';
+  if(/meat|poultry|fish|seafood|carne|pescado|pollo|jamon/i.test(s)) return 'Carne y pescado';
+  if(/fruit|vegetable|verdura|fruta|legum/i.test(s)) return 'Frutas y verduras';
+  if(/bread|bakery|pan|cereal|pasta|rice|arroz/i.test(s)) return 'Panadería';
+  if(/beverage|drink|water|juice|bebida|agua|refresco|soda/i.test(s)) return 'Bebidas';
+  if(/frozen|congelad|helad/i.test(s)) return 'Congelados';
+  if(/cleaning|detergent|limpieza|hogar|household/i.test(s)) return 'Limpieza y hogar';
+  return 'Despensa';
+}
+function stopScan(){
+  try{ if(scanReader && scanReader.reset) scanReader.reset(); }catch(e){}
+  try{ if(scanStream){ scanStream.getTracks().forEach(function(t){t.stop();}); } }catch(e){}
+  scanReader=null; scanStream=null;
+}
+function scanErr(){ $('scan-status').textContent='No se pudo abrir la cámara. Permite el acceso, o ábrela en Safari (no en modo app).'; }
+function startScan(){
+  var video=$('scan-video');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ scanErr(); return; }
+  if('BarcodeDetector' in window){
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(stream){
+      scanStream=stream; video.srcObject=stream; video.play();
+      var det=new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']});
+      var tick=function(){ if(!scanStream) return;
+        det.detect(video).then(function(codes){ if(codes&&codes.length) onBarcode(codes[0].rawValue); else requestAnimationFrame(tick); })
+          .catch(function(){ requestAnimationFrame(tick); }); };
+      requestAnimationFrame(tick);
+    }).catch(scanErr);
+  } else if(window.ZXing && ZXing.BrowserMultiFormatReader){
+    scanReader=new ZXing.BrowserMultiFormatReader();
+    scanReader.decodeFromConstraints({video:{facingMode:'environment'}}, video, function(result){ if(result) onBarcode(result.getText()); }).catch(scanErr);
+  } else { scanErr(); }
+}
+function onBarcode(code){ stopScan(); $('scan-status').textContent='Buscando '+code+'…'; lookupProduct(code); }
+function lookupProduct(code){
+  fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=product_name,product_name_es,generic_name_es,brands,quantity,categories_tags')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d && d.status===1 && d.product){
+        var p=d.product;
+        var name=p.product_name_es||p.product_name||p.generic_name_es||p.brands||('Producto '+code);
+        $('ov-scan').classList.remove('on');
+        $('l-nombre').value=name; $('l-cant').value=p.quantity||''; $('l-unid').value=''; $('l-cat').value=offCategory(p.categories_tags);
+        switchView('lista'); toast('📷 '+name+' — revisa y pulsa Añadir');
+      } else { $('scan-status').textContent='No encontrado en la base. Escríbelo a mano.'; setTimeout(function(){$('ov-scan').classList.remove('on');},1600); }
+    })
+    .catch(function(){ $('scan-status').textContent='Sin conexión para buscar el producto.'; });
+}
+$('l-scan').addEventListener('click', function(){ $('ov-scan').classList.add('on'); $('scan-status').textContent='Apunta al código de barras…'; startScan(); });
+$('scan-close').addEventListener('click', function(){ stopScan(); $('ov-scan').classList.remove('on'); });
+$('ov-scan').addEventListener('click', function(e){ if(e.target===this){ stopScan(); this.classList.remove('on'); } });
 
 /* habituales */
 fillCats($('hab-cat'));
