@@ -2156,7 +2156,17 @@ if(!USER) $('ov-name').classList.add('on');
 window.addEventListener('offline', function(){ setStatus('Sin conexión (modo offline)','off'); });
 window.addEventListener('online', function(){ setStatus('Sincronizado',''); });
 initFirebase();
-if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+if('serviceWorker' in navigator){
+  var _reloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){ if(_reloading) return; _reloading=true; location.reload(); });
+  navigator.serviceWorker.register('sw.js').then(function(reg){
+    reg.addEventListener('updatefound', function(){
+      var nw=reg.installing; if(!nw) return;
+      nw.addEventListener('statechange', function(){ if(nw.state==='installed' && navigator.serviceWorker.controller){ nw.postMessage&&nw.postMessage('skipWaiting'); } });
+    });
+    setInterval(function(){ reg.update(); }, 60*60*1000);
+  }).catch(function(){});
+}
 </script>
 </body>
 </html>
