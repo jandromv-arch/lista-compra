@@ -147,6 +147,7 @@
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
   .banner{background:var(--accent-soft);color:var(--accent-soft-ink);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
 </style>
+<script>(function(){try{var t=localStorage.getItem('lcr_theme')||'verde';var m=localStorage.getItem('lcr_mode')||'auto';var d=document.documentElement;if(t&&t!=='verde')d.setAttribute('data-theme',t);var dark=m==='dark'||(m==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(dark)d.setAttribute('data-mode','dark');}catch(e){}})();</script>
 </head>
 <body>
 <div class="top">
@@ -205,7 +206,7 @@
   <section class="view" id="v-menu">
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <button class="btn" id="m-gen" style="flex:1">🧾 Generar lista de la compra</button>
-      <button class="btn ghost sm" id="m-clear">Vaciar</button>
+      <button class="btn ghost sm" id="m-clear">Vaciar mi menú</button>
     </div>
     <div id="menu-body"></div>
   </section>
@@ -1879,7 +1880,7 @@ $('l-wa').addEventListener('click', function(){
   var lines=['🛒 *Lista de la compra*',''];
   Object.keys(groups).sort(function(a,b){return (order[a]==null?99:order[a])-(order[b]==null?99:order[b]);}).forEach(function(cat){
     lines.push((CAT_EMOJI[cat]||'📦')+' *'+cat+'*');
-    groups[cat].forEach(function(it){ var q=[it.cantidad,it.unidad].filter(Boolean).join(' '); lines.push('• '+it.nombre+(q?' ('+q+')':'')); });
+    groups[cat].forEach(function(it){ var q=[it.cantidad,it.unidad].filter(Boolean).join(' '); lines.push('• '+(it.urgente?'⚡ ':'')+it.nombre+(q?' ('+q+')':'')); });
     lines.push('');
   });
   window.open('https://wa.me/?text='+encodeURIComponent(lines.join('\n')),'_blank');
@@ -1946,6 +1947,7 @@ $('rec-save').addEventListener('click', function(){
 });
 $('rec-del').addEventListener('click', function(){
   if(!editingRec||!db) return;
+  if(!window.confirm('¿Eliminar la receta "'+editingRec.nombre+'"? No se puede deshacer.')) return;
   $('ov-rec').classList.remove('on');
   fbDeleteRecipe(editingRec.id).then(function(){toast('Receta eliminada');});
 });
@@ -2029,7 +2031,7 @@ $('desp-nombre').addEventListener('keydown', function(e){ if(e.key==='Enter') $(
 $('desp-list').addEventListener('click', function(e){
   var b=e.target.closest('[data-desp]'); if(!b||!db) return; fbRemoveDespensa(b.getAttribute('data-desp'));
 });
-$('m-clear').addEventListener('click', function(){ if(!db||!S.menu.length) return; fbClearMenu().then(function(){toast('Menú vaciado');}); });
+$('m-clear').addEventListener('click', function(){ if(!db) return; var mine=S.menu.filter(function(m){return (m.user||'')===(USER||'');}); if(!mine.length){ toast('Tu menú ya está vacío'); return; } fbClearMenu().then(function(){toast('Tu menú vaciado');}); });
 
 /* ===== escáner código de barras ===== */
 var scanReader=null, scanStream=null;
