@@ -77,6 +77,13 @@
   .it-sub{font-size:13px;color:var(--muted)}
   .item.done .it-name{text-decoration:line-through;color:var(--muted)}
   .x{flex:none;color:var(--muted);background:none;border:none;font-size:20px;padding:4px 6px;cursor:pointer;line-height:1}
+  .qty{display:flex;align-items:center;gap:5px;flex:none}
+  .qbtn{width:26px;height:26px;border-radius:8px;border:1px solid var(--line);background:var(--field);color:var(--ink);font-size:17px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0}
+  .qnum{min-width:52px;text-align:center;font-size:12.5px;color:var(--muted);font-weight:600}
+  .iconbtn{flex:none;background:none;border:none;font-size:15px;padding:4px 4px;cursor:pointer;opacity:.33;filter:grayscale(1)}
+  .item.urg{box-shadow:inset 3px 0 0 #e0453a}
+  .item.urg .iconbtn{opacity:1;filter:none}
+  .urg-head{color:#e0453a}
   .rec{padding:15px 16px;margin-bottom:12px}
   .rec h3{margin:0 0 3px;font-size:17px;letter-spacing:-.01em}
   .rec .meta{font-size:13px;color:var(--muted);margin-bottom:10px}
@@ -176,7 +183,8 @@
     </div>
     <div id="lista-body"></div>
     <div style="margin-top:18px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-      <button class="btn ghost sm" id="l-wa">📲 Enviar por WhatsApp</button>
+      <button class="btn ghost sm" id="l-wa">📲 WhatsApp</button>
+      <button class="btn ghost sm" id="l-hab">⭐ Habituales</button>
       <button class="btn ghost sm" id="l-desp">🧺 Despensa</button>
       <button class="btn ghost sm" id="l-clear">Vaciar comprados</button>
     </div>
@@ -273,6 +281,20 @@
     <p style="font-size:13px;color:var(--muted);margin:0 0 10px">Para saber quién añade y quién compra cada cosa. Solo tu nombre, sin registro.</p>
     <input id="name-input" placeholder="Tu nombre" enterkeyhint="done">
     <button class="btn wide" id="name-save" style="margin-top:12px">Guardar</button>
+  </div>
+</div>
+
+<div class="ov" id="ov-hab">
+  <div class="sheet">
+    <h2>⭐ Habituales</h2>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 10px">Tu compra de siempre. Guárdalos y añádelos todos de un toque.</p>
+    <div class="addbar"><input id="hab-nombre" placeholder="Producto" list="prod-list"><input id="hab-cant" placeholder="Cant." inputmode="decimal"><input id="hab-unid" placeholder="ud."></div>
+    <div class="addbar2"><select id="hab-cat"></select><button class="btn" id="hab-add">Guardar</button></div>
+    <div id="hab-list"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" id="hab-addall" style="flex:1">+ Añadir todos a la lista</button>
+      <button class="btn ghost" id="hab-close">Cerrar</button>
+    </div>
   </div>
 </div>
 
@@ -1506,7 +1528,7 @@ function macrosDeIngs(ings){
 }
 function macroBadge(ings){ var m=macrosDeIngs(ings); if(!m.hay) return ''; return '<span class="macro">🔥 '+m.kcal+' kcal · 💪 '+m.p+'g P</span>'; }
 
-var S = {lista:[],recetas:[],menu:[],favs:[],despensa:[]};
+var S = {lista:[],recetas:[],menu:[],favs:[],despensa:[],staples:[]};
 var slotCtx = null, recQuery='', recFilter='all', editingRec=null, genItems=[];
 var USER = localStorage.getItem('lcr_user')||'';
 
@@ -1563,6 +1585,7 @@ function startListeners(){
   hcol('recipes').onSnapshot(function(s){ S.recetas=mapDocs(s); S.favs=S.recetas.filter(function(r){return r.fav;}).map(function(r){return r.id;}); maybeSeed(); afterData(); }, errSnap);
   hcol('menu').onSnapshot(function(s){ S.menu=mapDocs(s); afterData(); }, errSnap);
   hcol('pantry').onSnapshot(function(s){ S.despensa=mapDocs(s); afterData(); }, errSnap);
+  hcol('staples').onSnapshot(function(s){ S.staples=mapDocs(s); afterData(); }, errSnap);
 }
 function errSnap(e){ setStatus('Sin conexión','off'); }
 function afterData(){
@@ -1588,6 +1611,14 @@ function fbSeed(){
 /* mutaciones */
 function fbAddItem(it){ return hcol('items').add({nombre:it.nombre,cantidad:it.cantidad||'',unidad:it.unidad||'',categoria:it.categoria||'Otros',comprado:false,addedBy:USER||'',boughtBy:'',creado:Date.now()}); }
 function fbToggleItem(id,comprado){ return hcol('items').doc(id).update({comprado:!!comprado, boughtBy: comprado?(USER||''):''}); }
+function fbSetQty(id,q){ return hcol('items').doc(id).update({cantidad:q}); }
+function fbSetUrgente(id,v){ return hcol('items').doc(id).update({urgente:!!v}); }
+function stepQty(it,dir){
+  var n=parseFloat(String(it.cantidad).replace(',','.')); if(isNaN(n)) return;
+  var u=normStr(it.unidad); var step=(u==='g'||u==='ml')?50:1;
+  n=Math.max(0, Math.round((n+dir*step)*100)/100);
+  fbSetQty(it.id, String(n));
+}
 function fbDeleteItem(id){ return hcol('items').doc(id).delete(); }
 function fbClearComprados(){ var b=db.batch(); S.lista.filter(function(i){return i.comprado;}).forEach(function(i){ b.delete(hcol('items').doc(i.id)); }); return b.commit(); }
 function fbSaveRecipe(rec){ var data={nombre:rec.nombre,grupo:rec.grupo||'',raciones:Number(rec.raciones)||1,ingredientes:rec.ingredientes||[],pasos:rec.pasos||''};
@@ -1633,7 +1664,7 @@ function addRecipeToList(recetaId,raciones){ var rec=S.recetas.filter(function(r
   return fbAddItems(items).then(function(){return {added:added,skipped:skipped};}); }
 
 /* ================= RENDER ================= */
-function render(){ renderLista(); renderRecetas(); renderMenu(); renderDatalist(); renderDespensa(); }
+function render(){ renderLista(); renderRecetas(); renderMenu(); renderDatalist(); renderDespensa(); renderStaples(); }
 function renderLista(){
   var body=$('lista-body');
   if(!S.lista.length){ body.innerHTML='<div class="empty-state"><div class="big">🛒</div>Lista vacía.<br>Añade lo que falte en casa.</div>'; return; }
@@ -1641,8 +1672,14 @@ function renderLista(){
   var done=S.lista.filter(function(i){return i.comprado;});
   var html='';
   var order={}; CATS.forEach(function(c,i){order[c[0]]=i;});
+  var urg=pend.filter(function(i){return i.urgente;});
+  if(urg.length){
+    html+='<div class="cat urg-head">⚡ Urgente ('+urg.length+')</div><div class="card">';
+    urg.forEach(function(it){ html+=itemHTML(it); });
+    html+='</div>';
+  }
   var groups={};
-  pend.forEach(function(it){var k=it.categoria||'Otros';(groups[k]=groups[k]||[]).push(it);});
+  pend.filter(function(i){return !i.urgente;}).forEach(function(it){var k=it.categoria||'Otros';(groups[k]=groups[k]||[]).push(it);});
   Object.keys(groups).sort(function(a,b){return (order[a]==null?99:order[a])-(order[b]==null?99:order[b]);})
     .forEach(function(cat){
       html+='<div class="cat">'+(CAT_EMOJI[cat]||'📦')+' '+esc(cat)+'</div><div class="card">';
@@ -1657,12 +1694,22 @@ function renderLista(){
   body.innerHTML=html;
 }
 function itemHTML(it){
-  var qty=[it.cantidad,it.unidad].filter(Boolean).join(' ');
+  var qtyLabel=[it.cantidad,it.unidad].filter(Boolean).join(' ');
+  var qn=parseFloat(String(it.cantidad).replace(',','.'));
+  var hasNum=!isNaN(qn) && String(it.cantidad).trim()!=='';
   var who = it.comprado ? (it.boughtBy?('✓ '+esc(it.boughtBy)):'') : (it.addedBy?('+ '+esc(it.addedBy)):'');
-  var sub=[qty?esc(qty):'', who].filter(Boolean).join(' · ');
-  return '<div class="item'+(it.comprado?' done':'')+'" data-id="'+it.id+'">'+
+  var subParts=[];
+  if(!hasNum && qtyLabel) subParts.push(esc(qtyLabel));
+  if(who) subParts.push(who);
+  var sub=subParts.join(' · ');
+  var stepper = (hasNum && !it.comprado) ?
+    '<div class="qty"><button class="qbtn" data-act="minus">−</button><span class="qnum">'+esc(qtyLabel)+'</span><button class="qbtn" data-act="plus">+</button></div>' :
+    (hasNum && it.comprado ? '<span class="qnum">'+esc(qtyLabel)+'</span>' : '');
+  return '<div class="item'+(it.comprado?' done':'')+(it.urgente?' urg':'')+'" data-id="'+it.id+'">'+
     '<div class="check" data-act="toggle"><svg width="13" height="13" viewBox="0 0 13 13"><path d="M2 7l3 3 6-7" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
     '<div class="it-main"><div class="it-name">'+esc(it.nombre)+'</div>'+(sub?'<div class="it-sub">'+sub+'</div>':'')+'</div>'+
+    stepper +
+    '<button class="iconbtn" data-act="urg" title="Marcar urgente">⚡</button>'+
     '<button class="x" data-act="del">×</button></div>';
 }
 function isFav(id){ return (S.favs||[]).indexOf(id)>-1; }
@@ -1680,7 +1727,16 @@ function recCardHTML(r){
     '<div class="rec-actions" style="margin-top:11px">'+
       '<button class="btn sm" data-act="addlist">+ A la lista</button>'+
       '<button class="btn ghost sm" data-act="edit">Editar</button>'+
+      '<button class="btn ghost sm" data-act="share" title="Compartir por WhatsApp">📲</button>'+
     '</div></div>';
+}
+function recipeText(r){
+  var lines=['🍽️ *'+r.nombre+'*  ('+r.raciones+' rac.)'];
+  var m=macrosDeIngs(r.ingredientes); if(m.hay) lines.push('🔥 '+m.kcal+' kcal · 💪 '+m.p+'g proteína');
+  lines.push('','*Ingredientes:*');
+  (r.ingredientes||[]).forEach(function(g){ var q=[g.cantidad,g.unidad].filter(Boolean).join(' '); lines.push('• '+g.nombre+(q?' — '+q:'')); });
+  if(r.pasos){ lines.push('','*Preparación:*',r.pasos); }
+  return lines.join('\n');
 }
 function recMatch(r){
   if(recFilter==='fav' && !isFav(r.id)) return false;
@@ -1770,10 +1826,13 @@ $('lista-body').addEventListener('click', function(e){
   var item=e.target.closest('.item'); if(!item||!db) return;
   var id=item.getAttribute('data-id');
   var act=e.target.closest('[data-act]'); if(!act) return;
-  if(act.getAttribute('data-act')==='toggle'){
-    var cur=S.lista.filter(function(i){return i.id===id;})[0];
-    fbToggleItem(id, cur?!cur.comprado:true);
-  }else if(act.getAttribute('data-act')==='del'){ fbDeleteItem(id); }
+  var a=act.getAttribute('data-act');
+  var cur=S.lista.filter(function(i){return i.id===id;})[0];
+  if(a==='toggle'){ fbToggleItem(id, cur?!cur.comprado:true); }
+  else if(a==='del'){ fbDeleteItem(id); }
+  else if(a==='minus'&&cur){ stepQty(cur,-1); }
+  else if(a==='plus'&&cur){ stepQty(cur,1); }
+  else if(a==='urg'&&cur){ fbSetUrgente(id, !cur.urgente); }
 });
 $('l-clear').addEventListener('click', function(){
   if(!db||!S.lista.some(function(i){return i.comprado;})) return;
@@ -1808,6 +1867,7 @@ $('recetas-body').addEventListener('click', function(e){
   var rec=S.recetas.filter(function(r){return r.id===id;})[0];
   var act=e.target.closest('[data-act]'); if(!act||!rec) return;
   if(act.getAttribute('data-act')==='fav'){ fbToggleFav(rec.id); }
+  else if(act.getAttribute('data-act')==='share'){ window.open('https://wa.me/?text='+encodeURIComponent(recipeText(rec)),'_blank'); }
   else if(act.getAttribute('data-act')==='edit') openRec(rec);
   else if(act.getAttribute('data-act')==='addlist'){
     addRecipeToList(rec.id,rec.raciones).then(function(r){
@@ -1936,7 +1996,37 @@ $('desp-list').addEventListener('click', function(e){
 });
 $('m-clear').addEventListener('click', function(){ if(!db||!S.menu.length) return; fbClearMenu().then(function(){toast('Menú vaciado');}); });
 
-['ov-rec','ov-slot','ov-gen','ov-desp','ov-name','ov-cfg'].forEach(function(id){ $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); }); });
+/* habituales */
+fillCats($('hab-cat'));
+function fbAddStaple(it){ if(S.staples.some(function(x){return normStr(x.nombre)===normStr(it.nombre);})) return Promise.resolve(); return hcol('staples').add({nombre:it.nombre,cantidad:it.cantidad||'',unidad:it.unidad||'',categoria:it.categoria||'Otros'}); }
+function fbRemoveStaple(id){ return hcol('staples').doc(id).delete(); }
+function renderStaples(){
+  var el=$('hab-list'); if(!el) return;
+  var d=S.staples||[];
+  if(!d.length){ el.innerHTML='<div class="empty-state" style="padding:16px;color:var(--muted)">Aún no hay habituales.</div>'; return; }
+  el.innerHTML='<div class="card">'+d.map(function(x){
+    var q=[x.cantidad,x.unidad].filter(Boolean).join(' ');
+    return '<div class="item"><div class="it-main"><div class="it-name">'+esc(x.nombre)+'</div>'+(q?'<div class="it-sub">'+esc(q)+'</div>':'')+'</div>'+
+      '<button class="x" data-staple="'+x.id+'">×</button></div>';
+  }).join('')+'</div>';
+}
+$('l-hab').addEventListener('click', function(){ $('ov-hab').classList.add('on'); });
+$('hab-close').addEventListener('click', function(){ $('ov-hab').classList.remove('on'); });
+$('hab-add').addEventListener('click', function(){
+  var n=$('hab-nombre').value.trim(); if(!n||!db) return;
+  fbAddStaple({nombre:n,cantidad:$('hab-cant').value.trim(),unidad:$('hab-unid').value.trim(),categoria:$('hab-cat').value});
+  $('hab-nombre').value='';$('hab-cant').value='';$('hab-unid').value='';$('hab-nombre').focus();
+});
+$('hab-nombre').addEventListener('keydown', function(e){ if(e.key==='Enter') $('hab-add').click(); });
+$('hab-list').addEventListener('click', function(e){ var b=e.target.closest('[data-staple]'); if(!b||!db) return; fbRemoveStaple(b.getAttribute('data-staple')); });
+$('hab-addall').addEventListener('click', function(){
+  if(!S.staples.length){ toast('No hay habituales'); return; }
+  fbAddItems(S.staples.map(function(x){return {nombre:x.nombre,cantidad:x.cantidad,unidad:x.unidad,categoria:x.categoria};})).then(function(){
+    $('ov-hab').classList.remove('on'); toast('Habituales añadidos'); switchView('lista');
+  });
+});
+
+['ov-rec','ov-slot','ov-gen','ov-desp','ov-name','ov-cfg','ov-hab'].forEach(function(id){ $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); }); });
 
 /* tema: eventos */
 $('cfg').addEventListener('click', function(){ renderCfg(); $('ov-cfg').classList.add('on'); });
