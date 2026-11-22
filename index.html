@@ -371,7 +371,7 @@
     <h2>🎨 Apariencia</h2>
     <div class="fld"><label>Color</label><div id="cfg-themes" style="display:flex;gap:8px;flex-wrap:wrap"></div></div>
     <div class="fld"><label>Modo</label><div id="cfg-modes" style="display:flex;gap:8px"></div></div>
-    <div class="fld"><label>Lector de tickets (URL del Worker)</label><input id="cfg-ticket" placeholder="https://ticket.xxx.workers.dev"></div>
+    <div class="fld"><label>Clave de Gemini (lector de tickets 🧾)</label><input id="cfg-ticket" placeholder="AIza… (de aistudio.google.com)"></div>
     <button class="btn ghost wide" id="cfg-close" style="margin-top:6px">Cerrar</button>
   </div>
 </div>
@@ -2238,9 +2238,9 @@ $('scan-close').addEventListener('click', function(){ stopScan(); $('ov-scan').c
 $('ov-scan').addEventListener('click', function(e){ if(e.target===this){ stopScan(); this.classList.remove('on'); } });
 
 /* ===== ticket (foto → Worker Gemini) + gastos ===== */
-function workerUrl(){ return (localStorage.getItem('lcr_ticket_url')||'').trim(); }
+function geminiKey(){ return (localStorage.getItem('lcr_gemini_key')||'').trim(); }
 $('l-ticket').addEventListener('click', function(){
-  if(!workerUrl()){ toast('Configura el lector en 🎨 (arriba)'); openCfg(); return; }
+  if(!geminiKey()){ toast('Pega tu clave de Gemini en 🎨 (arriba)'); openCfg(); return; }
   $('ticket-file').click();
 });
 $('ticket-file').addEventListener('change', function(){
@@ -2261,15 +2261,21 @@ function compressImage(file, cb){
 var ticketItems=[], ticketMeta={};
 function sendTicket(dataUrl){
   $('ticket-meta').textContent='Leyendo el ticket… (unos segundos)'; $('ticket-list').innerHTML=''; $('ov-ticket').classList.add('on');
-  fetch(workerUrl(), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({image:dataUrl})})
+  var b64=String(dataUrl).replace(/^data:image\/\w+;base64,/,'');
+  var prompt='Eres un lector de tickets de supermercado en español. Devuelve SOLO JSON válido con esta forma exacta: {"tienda":string,"fecha":"YYYY-MM-DD","total":number,"items":[{"nombre":string,"cantidad":number,"precio":number}]}. nombre en minúsculas y legible (corrige abreviaturas obvias, p.ej. "TOMATE RAMA"->"tomate"). precio: precio total de esa línea en euros con punto decimal. cantidad: unidades o peso si aparece, si no 1. Ignora líneas que no sean productos (descuentos, totales, IVA, tarjeta). Si un dato no se ve pon null. No añadas texto fuera del JSON.';
+  var body={ contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:b64}}]}], generationConfig:{temperature:0, responseMimeType:'application/json'} };
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+encodeURIComponent(geminiKey()), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
     .then(function(r){return r.json();})
-    .then(function(d){
-      if(d.error){ $('ticket-meta').textContent='Error: '+d.error; return; }
+    .then(function(j){
+      if(j.error){ $('ticket-meta').textContent='Error de Gemini: '+(j.error.message||'revisa la clave'); return; }
+      var parts=(((j.candidates||[])[0]||{}).content||{}).parts;
+      var out=(parts&&parts[0]&&parts[0].text)?parts[0].text:'{}';
+      var d={}; try{ d=JSON.parse(out); }catch(e){ $('ticket-meta').textContent='No pude interpretar el ticket. Prueba otra foto.'; return; }
       ticketMeta={tienda:d.tienda||'', fecha:d.fecha||new Date().toISOString().slice(0,10), total:d.total};
       ticketItems=(d.items||[]).map(function(it){ return {nombre:it.nombre||'', cantidad:it.cantidad||1, precio:(it.precio!=null?it.precio:null), sel:!!it.nombre}; }).filter(function(x){return x.nombre;});
       renderTicket();
     })
-    .catch(function(){ $('ticket-meta').textContent='No se pudo conectar con el lector. Revisa la URL del Worker en Ajustes.'; });
+    .catch(function(){ $('ticket-meta').textContent='No se pudo conectar con Gemini. Revisa tu conexión y la clave.'; });
 }
 function renderTicket(){
   var m=ticketMeta;
@@ -2346,8 +2352,8 @@ $('hab-addall').addEventListener('click', function(){
 ['ov-rec','ov-slot','ov-gen','ov-desp','ov-name','ov-cfg','ov-hab','ov-item','ov-ticket','ov-gastos'].forEach(function(id){ $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); }); });
 
 /* tema: eventos */
-function openCfg(){ renderCfg(); $('cfg-ticket').value=localStorage.getItem('lcr_ticket_url')||''; $('ov-cfg').classList.add('on'); }
-function saveCfgTicket(){ localStorage.setItem('lcr_ticket_url', $('cfg-ticket').value.trim()); }
+function openCfg(){ renderCfg(); $('cfg-ticket').value=localStorage.getItem('lcr_gemini_key')||''; $('ov-cfg').classList.add('on'); }
+function saveCfgTicket(){ localStorage.setItem('lcr_gemini_key', $('cfg-ticket').value.trim()); }
 $('cfg').addEventListener('click', openCfg);
 $('cfg-ticket').addEventListener('change', saveCfgTicket);
 $('cfg-close').addEventListener('click', function(){ saveCfgTicket(); $('ov-cfg').classList.remove('on'); });
