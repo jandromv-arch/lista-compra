@@ -1634,7 +1634,7 @@ function macrosDeIngs(ings){
 }
 function macroBadge(ings){ var m=macrosDeIngs(ings); if(!m.hay) return ''; return '<span class="macro">🔥 '+m.kcal+' kcal · 💪 '+m.p+'g P</span>'; }
 
-var S = {lista:[],recetas:[],menu:[],favs:[],despensa:[],staples:[],compras:[]};
+var S = {lista:[],recetas:[],menu:[],favs:[],despensa:[],staples:[],compras:[],productos:[]};
 var slotCtx = null, recQuery='', recFilter='all', editingRec=null, genItems=[], menuUser=null;
 var USER = localStorage.getItem('lcr_user')||'';
 
@@ -1693,6 +1693,7 @@ function startListeners(){
   hcol('pantry').onSnapshot(function(s){ S.despensa=mapDocs(s); afterData(); }, errSnap);
   hcol('staples').onSnapshot(function(s){ S.staples=mapDocs(s); afterData(); }, errSnap);
   hcol('compras').onSnapshot(function(s){ S.compras=mapDocs(s); afterData(); }, errSnap);
+  hcol('productos').onSnapshot(function(s){ S.productos=mapDocs(s); afterData(); }, errSnap);
 }
 function errSnap(e){ setStatus('Sin conexión','off'); }
 function afterData(){
@@ -1716,7 +1717,20 @@ function fbSeed(){
 }
 
 /* mutaciones */
-function fbAddItem(it){ return hcol('items').add({nombre:it.nombre,cantidad:it.cantidad||'',unidad:it.unidad||'',categoria:it.categoria||'Otros',precio:it.precio||'',comprado:false,addedBy:USER||'',boughtBy:'',creado:Date.now()}); }
+function fbAddItem(it){ fbSaveProducto(it); return hcol('items').add({nombre:it.nombre,cantidad:it.cantidad||'',unidad:it.unidad||'',categoria:it.categoria||'Otros',precio:it.precio||'',comprado:false,addedBy:USER||'',boughtBy:'',creado:Date.now()}); }
+function fbSaveProducto(it){
+  if(!db||!it||!it.nombre) return Promise.resolve();
+  var ex=(S.productos||[]).filter(function(p){return normStr(p.nombre)===normStr(it.nombre);})[0];
+  var data={nombre:it.nombre, categoria:it.categoria||'Otros'};
+  if(it.precio) data.precio=it.precio;
+  if(it.barcode) data.barcode=it.barcode;
+  if(ex){ // actualiza precio/categoría si ha cambiado
+    if((it.precio && String(it.precio)!==String(ex.precio)) || (it.categoria && it.categoria!==ex.categoria)){ return hcol('productos').doc(ex.id).update(data); }
+    return Promise.resolve();
+  }
+  data.creado=Date.now();
+  return hcol('productos').add(data);
+}
 function fbToggleItem(id,comprado){ return hcol('items').doc(id).update({comprado:!!comprado, boughtBy: comprado?(USER||''):''}); }
 function fbSetQty(id,q){ return hcol('items').doc(id).update({cantidad:q}); }
 function fbSetUrgente(id,v){ return hcol('items').doc(id).update({urgente:!!v}); }
@@ -1968,10 +1982,11 @@ var COMMON=[['Leche','Lácteos y huevos'],['Huevos','Lácteos y huevos'],['Yogur
 function productPool(){
   var set={};
   function add(n,c){ if(n && !set[normStr(n)]) set[normStr(n)]={nombre:n,cat:c||'Otros'}; }
-  S.recetas.forEach(function(r){(r.ingredientes||[]).forEach(function(g){ add(g.nombre,g.categoria); });});
+  (S.productos||[]).forEach(function(x){ add(x.nombre,x.categoria); });
   S.lista.forEach(function(it){ add(it.nombre,it.categoria); });
   (S.staples||[]).forEach(function(x){ add(x.nombre,x.categoria); });
   (S.despensa||[]).forEach(function(x){ add(x.nombre,x.categoria); });
+  S.recetas.forEach(function(r){(r.ingredientes||[]).forEach(function(g){ add(g.nombre,g.categoria); });});
   COMMON.forEach(function(c){ add(c[0],c[1]); });
   return set;
 }
@@ -2255,9 +2270,11 @@ function lookupProduct(code){
       if(d && d.status===1 && d.product){
         var p=d.product;
         var name=p.product_name_es||p.product_name||p.generic_name_es||p.brands||('Producto '+code);
+        var cat=offCategory(p.categories_tags);
+        fbSaveProducto({nombre:name, categoria:cat, barcode:code});
         $('ov-scan').classList.remove('on');
-        $('l-nombre').value=name; $('l-cant').value=p.quantity||''; $('l-unid').value=''; $('l-cat').value=offCategory(p.categories_tags);
-        switchView('lista'); toast('📷 '+name+' — revisa y pulsa Añadir');
+        $('l-nombre').value=name; $('l-cant').value=p.quantity||''; $('l-unid').value=''; $('l-cat').value=cat; pickedPrice=''; pickedName='';
+        switchView('lista'); toast('📷 Guardado: '+name+' — pon cantidad y Añade'); buzz(14);
       } else { $('scan-status').textContent='No encontrado en la base. Escríbelo a mano.'; setTimeout(function(){$('ov-scan').classList.remove('on');},1600); }
     })
     .catch(function(){ $('scan-status').textContent='Sin conexión para buscar el producto.'; });
