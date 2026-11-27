@@ -2527,18 +2527,29 @@ function renderProds(){
   fillProdImages(list);
 }
 var MERCIMG=null;
-function mercImgFor(name){
+function buildMercIndex(){ MERCIMG={}; for(var i=0;i<MERC.length;i++){ if(MERC[i].img) MERCIMG[MERCN[i]]=MERC[i].img; } }
+function mercMatch(name){
   if(!MERC.length) return '';
-  if(!MERCIMG){ MERCIMG={}; for(var i=0;i<MERC.length;i++){ if(MERC[i].img) MERCIMG[MERCN[i]]=MERC[i].img; } }
-  return MERCIMG[normStr(name)]||'';
+  if(!MERCIMG) buildMercIndex();
+  var nn=normStr(name);
+  if(MERCIMG[nn]) return MERCIMG[nn];           // 1) exacto
+  var toks=nn.split(/[^a-z0-9]+/).filter(function(t){return t.length>=4;});
+  if(toks.length<2) return '';                  // 2) palabras clave (≥2 tokens de ≥4 letras)
+  var best='', bestLen=1e9;
+  for(var i=0;i<MERC.length;i++){ if(!MERC[i].img) continue; var mn=MERCN[i];
+    var ok=true; for(var k=0;k<toks.length;k++){ if(mn.indexOf(toks[k])<0){ ok=false; break; } }
+    if(ok && mn.length<bestLen){ best=MERC[i].img; bestLen=mn.length; }
+  }
+  return best;
 }
 function fillProdImages(list){
   if(!MERC.length||!db) return;
   list.forEach(function(p){
     if(imgFetching[p.id]) return;
-    var im=mercImgFor(p.nombre); if(!im || p.img===im) return;
-    var isOff=p.img && /openfoodfacts/i.test(p.img);
-    if(!p.img || isOff){ imgFetching[p.id]=1; hcol('productos').doc(p.id).update({img:im}); }
+    var m=mercMatch(p.nombre);
+    if(m){ if(p.img!==m){ imgFetching[p.id]=1; hcol('productos').doc(p.id).update({img:m}); } return; }
+    // sin match: borra foto OFF que venga de búsqueda (sin código de barras) por errónea
+    if(p.img && /openfoodfacts/i.test(p.img) && !p.barcode){ imgFetching[p.id]=1; hcol('productos').doc(p.id).update({img:''}); }
   });
 }
 $('prods-search').addEventListener('input', function(){ prodsQuery=this.value; renderProds(); });
