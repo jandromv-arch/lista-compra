@@ -2360,7 +2360,7 @@ function sendTicket(dataUrl){
   ticketPhoto=''; shrinkDataUrl(dataUrl, 760, 0.5, function(s){ ticketPhoto=s||''; });
   var b64=String(dataUrl).replace(/^data:image\/\w+;base64,/,'');
   var prompt='Eres un lector de tickets de supermercado en español. Devuelve SOLO JSON válido con esta forma exacta: {"tienda":string,"fecha":"YYYY-MM-DD","total":number,"items":[{"nombre":string,"cantidad":number,"precio":number}]}. nombre en minúsculas y legible (corrige abreviaturas obvias, p.ej. "TOMATE RAMA"->"tomate"). precio: precio total de esa línea en euros con punto decimal. cantidad: unidades o peso si aparece, si no 1. Ignora líneas que no sean productos (descuentos, totales, IVA, tarjeta). Si un dato no se ve pon null. No añadas texto fuera del JSON.';
-  var body={ contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:b64}}]}], generationConfig:{temperature:0, responseMimeType:'application/json', thinkingConfig:{thinkingBudget:0}} };
+  var body={ contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:b64}}]}], generationConfig:{temperature:0, responseMimeType:'application/json'} };
   var MODEL='gemini-3.8-flash', tries=0, maxTries=4;
   function extractText(j){
     var cands=j.candidates||[]; for(var i=0;i<cands.length;i++){ var parts=((cands[i].content||{}).parts)||[]; for(var k=0;k<parts.length;k++){ if(parts[k] && typeof parts[k].text==='string' && parts[k].text.trim()) return parts[k].text; } }
