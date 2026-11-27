@@ -2520,9 +2520,9 @@ function lazyProdImages(list){
   var need=list.filter(function(p){return !p.img && !imgFetching[p.id];}).slice(0,4);
   need.forEach(function(p){ imgFetching[p.id]=1;
     fetch('https://world.openfoodfacts.org/cgi/search.pl?search_terms='+encodeURIComponent(p.nombre)+'&fields=image_front_small_url&page_size=1&json=1')
-      .then(function(r){return r.json();})
-      .then(function(d){ var im=d&&d.products&&d.products[0]&&d.products[0].image_front_small_url; if(im&&db){ hcol('productos').doc(p.id).update({img:im}); } })
-      .catch(function(){});
+      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+      .then(function(d){ var im=d&&d.products&&d.products[0]&&d.products[0].image_front_small_url; if(im&&db){ hcol('productos').doc(p.id).update({img:im}); } else { delete imgFetching[p.id]; } })
+      .catch(function(){ setTimeout(function(){ delete imgFetching[p.id]; }, 4000); });
   });
 }
 $('l-prods').addEventListener('click', function(){ prodsQuery=''; $('prods-search').value=''; renderProds(); $('ov-prods').classList.add('on'); });
