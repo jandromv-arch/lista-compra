@@ -2342,13 +2342,26 @@ function shrinkDataUrl(dataUrl, max, q, cb){
   img.src=dataUrl;
 }
 var ticketItems=[], ticketMeta={}, ticketPhoto='';
+function pickModel(cb){
+  var cached=localStorage.getItem('lcr_gemini_model');
+  if(cached){ cb(cached); return; }
+  fetch('https://generativelanguage.googleapis.com/v1beta/models?key='+encodeURIComponent(geminiKey()))
+    .then(function(r){return r.json();})
+    .then(function(j){
+      var models=(j.models||[]).filter(function(m){ return (m.supportedGenerationMethods||[]).indexOf('generateContent')>-1; }).map(function(m){ return (m.name||'').replace('models/',''); });
+      function find(re){ for(var i=0;i<models.length;i++){ if(re.test(models[i]) && !/exp|preview|thinking|vision|image|tts|audio|embedding/i.test(models[i])) return models[i]; } return ''; }
+      var pref = find(/flash-lite/i) || find(/flash/i) || models[0] || 'gemini-3.8-flash';
+      localStorage.setItem('lcr_gemini_model',pref); cb(pref);
+    })
+    .catch(function(){ cb('gemini-3.8-flash'); });
+}
 function sendTicket(dataUrl){
   $('ticket-meta').textContent='Leyendo el ticket… (unos segundos)'; $('ticket-list').innerHTML=''; $('ov-ticket').classList.add('on');
   ticketPhoto=''; shrinkDataUrl(dataUrl, 760, 0.5, function(s){ ticketPhoto=s||''; });
   var b64=String(dataUrl).replace(/^data:image\/\w+;base64,/,'');
   var prompt='Eres un lector de tickets de supermercado en español. Devuelve SOLO JSON válido con esta forma exacta: {"tienda":string,"fecha":"YYYY-MM-DD","total":number,"items":[{"nombre":string,"cantidad":number,"precio":number}]}. nombre en minúsculas y legible (corrige abreviaturas obvias, p.ej. "TOMATE RAMA"->"tomate"). precio: precio total de esa línea en euros con punto decimal. cantidad: unidades o peso si aparece, si no 1. Ignora líneas que no sean productos (descuentos, totales, IVA, tarjeta). Si un dato no se ve pon null. No añadas texto fuera del JSON.';
   var body={ contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:b64}}]}], generationConfig:{temperature:0, responseMimeType:'application/json', thinkingConfig:{thinkingBudget:0}} };
-  var MODEL='gemini-3.8-flash', tries=0, maxTries=5;
+  var MODEL='gemini-3.8-flash', tries=0, maxTries=4;
   function extractText(j){
     var cands=j.candidates||[]; for(var i=0;i<cands.length;i++){ var parts=((cands[i].content||{}).parts)||[]; for(var k=0;k<parts.length;k++){ if(parts[k] && typeof parts[k].text==='string' && parts[k].text.trim()) return parts[k].text; } }
     if(typeof j.text==='string') return j.text;
@@ -2369,6 +2382,7 @@ function sendTicket(dataUrl){
           var msg=(j.error.message||JSON.stringify(j.error));
           var overloaded = j.error.code===503 || j.error.code===429 || j.error.status==='UNAVAILABLE' || j.error.status==='RESOURCE_EXHAUSTED' || /high demand|overload|unavailable|try again|demanda|resource/i.test(msg);
           if(overloaded && tries<maxTries){ setTimeout(attempt, tries*2500); return; }
+          if(/not found|not supported|no longer available|is not found/i.test(msg)){ localStorage.removeItem('lcr_gemini_model'); $('ticket-meta').textContent='Modelo no válido, probaré otro: vuelve a pulsar 🧾 Ticket.'; return; }
           $('ticket-meta').textContent='Error de Gemini: '+msg.slice(0,180); return;
         }
         var out=extractText(j);
@@ -2379,10 +2393,10 @@ function sendTicket(dataUrl){
         ticketPayer=USER||''; renderTicket();
       })
       .catch(function(e){ clearTimeout(timer);
-        $('ticket-meta').textContent=(e&&e.name==='AbortError')?'Tardó demasiado (45s). Vuelve a pulsar 🧾 Ticket; Gemini estaba lento.':'No se pudo conectar con Gemini. Revisa conexión y clave.';
+        $('ticket-meta').textContent=(e&&e.name==='AbortError')?'Tardó demasiado (45s). Vuelve a pulsar 🧾 Ticket; el modelo estaba lento.':'No se pudo conectar con Gemini. Revisa conexión y clave.';
       });
   }
-  attempt();
+  pickModel(function(m){ MODEL=m||MODEL; attempt(); });
 }
 function peopleKnown(){
   var set={}; if(USER)set[USER]=1;
