@@ -2310,18 +2310,29 @@ function sendTicket(dataUrl){
   var b64=String(dataUrl).replace(/^data:image\/\w+;base64,/,'');
   var prompt='Eres un lector de tickets de supermercado en español. Devuelve SOLO JSON válido con esta forma exacta: {"tienda":string,"fecha":"YYYY-MM-DD","total":number,"items":[{"nombre":string,"cantidad":number,"precio":number}]}. nombre en minúsculas y legible (corrige abreviaturas obvias, p.ej. "TOMATE RAMA"->"tomate"). precio: precio total de esa línea en euros con punto decimal. cantidad: unidades o peso si aparece, si no 1. Ignora líneas que no sean productos (descuentos, totales, IVA, tarjeta). Si un dato no se ve pon null. No añadas texto fuera del JSON.';
   var body={ contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:b64}}]}], generationConfig:{temperature:0, responseMimeType:'application/json'} };
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key='+encodeURIComponent(geminiKey()), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
-    .then(function(r){return r.json();})
-    .then(function(j){
-      if(j.error){ $('ticket-meta').textContent='Error de Gemini: '+(j.error.message||'revisa la clave'); return; }
-      var parts=(((j.candidates||[])[0]||{}).content||{}).parts;
-      var out=(parts&&parts[0]&&parts[0].text)?parts[0].text:'{}';
-      var d={}; try{ d=JSON.parse(out); }catch(e){ $('ticket-meta').textContent='No pude interpretar el ticket. Prueba otra foto.'; return; }
+  var MODEL='gemini-3.8-flash';
+  var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
+  var timer=setTimeout(function(){ if(ctrl)ctrl.abort(); }, 90000);
+  function extractText(j){
+    var cands=j.candidates||[]; for(var i=0;i<cands.length;i++){ var parts=((cands[i].content||{}).parts)||[]; for(var k=0;k<parts.length;k++){ if(parts[k] && typeof parts[k].text==='string' && parts[k].text.trim()) return parts[k].text; } }
+    if(typeof j.text==='string') return j.text;
+    if(j.output_text) return j.output_text;
+    return '';
+  }
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent?key='+encodeURIComponent(geminiKey()), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:ctrl?ctrl.signal:undefined})
+    .then(function(r){return r.text();})
+    .then(function(raw){
+      clearTimeout(timer);
+      var j={}; try{ j=JSON.parse(raw); }catch(e){ $('ticket-meta').textContent='Respuesta no-JSON: '+raw.slice(0,160); return; }
+      if(j.error){ $('ticket-meta').textContent='Error de Gemini: '+(j.error.message||JSON.stringify(j.error)).slice(0,180); return; }
+      var out=extractText(j);
+      if(!out){ var pf=(((j.candidates||[])[0]||{}).finishReason)||''; $('ticket-meta').textContent='Gemini no devolvió texto'+(pf?(' ('+pf+')'):'')+'. Respuesta: '+raw.slice(0,160); return; }
+      var d={}; try{ d=JSON.parse(out); }catch(e){ $('ticket-meta').textContent='No pude interpretar: '+out.slice(0,160); return; }
       ticketMeta={tienda:d.tienda||'', fecha:d.fecha||new Date().toISOString().slice(0,10), total:d.total};
       ticketItems=(d.items||[]).map(function(it){ return {nombre:it.nombre||'', cantidad:it.cantidad||1, precio:(it.precio!=null?it.precio:null), sel:!!it.nombre}; }).filter(function(x){return x.nombre;});
       ticketPayer=USER||''; renderTicket();
     })
-    .catch(function(){ $('ticket-meta').textContent='No se pudo conectar con Gemini. Revisa tu conexión y la clave.'; });
+    .catch(function(e){ clearTimeout(timer); $('ticket-meta').textContent=(e&&e.name==='AbortError')?'Tardó demasiado (90s). Prueba una foto más pequeña/nítida.':'No se pudo conectar con Gemini. Revisa conexión y clave.'; });
 }
 function peopleKnown(){
   var set={}; if(USER)set[USER]=1;
