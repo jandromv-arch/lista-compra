@@ -210,7 +210,6 @@
     <div style="margin-top:18px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
       <button class="btn ghost sm" id="l-scan">📷 Escanear</button>
       <button class="btn ghost sm" id="l-ticket">🧾 Ticket</button>
-      <button class="btn ghost sm" id="l-prods">📦 Productos</button>
       <button class="btn ghost sm" id="l-gastos">💶 Gastos</button>
       <button class="btn ghost sm" id="l-wa">📲 WhatsApp</button>
       <button class="btn ghost sm" id="l-hab">⭐ Habituales</button>
@@ -238,12 +237,19 @@
     </div>
     <div id="menu-body"></div>
   </section>
+
+  <section class="view" id="v-prods">
+    <p style="font-size:13px;color:var(--muted);margin:0 0 10px">Todo lo que compráis (precio y súper). Toca uno para añadirlo a la lista.</p>
+    <div class="searchbar"><input id="prods-search" placeholder="Buscar producto…" autocomplete="off"></div>
+    <div id="prods-list"></div>
+  </section>
 </main>
 
 <nav>
   <button class="on" data-v="lista"><span class="ic">🛒</span>Lista</button>
   <button data-v="recetas"><span class="ic">📖</span>Recetas</button>
   <button data-v="menu"><span class="ic">🗓️</span>Menú</button>
+  <button data-v="prods"><span class="ic">📦</span>Productos</button>
 </nav>
 
 <div class="ov" id="ov-rec">
@@ -336,16 +342,6 @@
     <div style="display:flex;gap:8px;margin:12px 0"><button class="btn ghost sm" id="gasto-add">+ Gasto manual</button></div>
     <div id="gastos-list"></div>
     <div style="margin-top:14px"><button class="btn ghost wide" id="gastos-close">Cerrar</button></div>
-  </div>
-</div>
-
-<div class="ov" id="ov-prods">
-  <div class="sheet">
-    <h2>📦 Productos</h2>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 8px">Todo lo que compráis (precio y súper). Toca uno para añadirlo a la lista.</p>
-    <div class="searchbar"><input id="prods-search" placeholder="Buscar producto…" autocomplete="off"></div>
-    <div id="prods-list"></div>
-    <button class="btn ghost wide" id="prods-close" style="margin-top:12px">Cerrar</button>
   </div>
 </div>
 
@@ -1816,7 +1812,7 @@ function addRecipeToList(recetaId,raciones){ var rec=S.recetas.filter(function(r
   return fbAddItems(items).then(function(){return {added:added,skipped:skipped};}); }
 
 /* ================= RENDER ================= */
-function render(){ renderLista(); renderRecetas(); renderMenu(); renderDatalist(); renderDespensa(); renderStaples(); updateAlerts(); if($('ov-gastos')&&$('ov-gastos').classList.contains('on')) renderGastos(); if($('ov-prods')&&$('ov-prods').classList.contains('on')) renderProds(); }
+function render(){ renderLista(); renderRecetas(); renderMenu(); renderDatalist(); renderDespensa(); renderStaples(); updateAlerts(); if($('ov-gastos')&&$('ov-gastos').classList.contains('on')) renderGastos(); if($('v-prods')&&$('v-prods').classList.contains('on')) renderProds(); }
 function updateAlerts(){
   var w=$('cfg-warn'); if(!w) return;
   var soon=(S.despensa||[]).filter(function(x){var dd=diasHasta(x.caduca); return dd!=null && dd<=2;});
@@ -2030,28 +2026,29 @@ function renderSuggest(){
   Object.keys(pool).filter(function(k){return k.indexOf(q)>-1;})
     .sort(function(a,b){ return (a.indexOf(q)) - (b.indexOf(q)) || a.localeCompare(b); })
     .forEach(function(k){ if(out.length<8 && !seen[k]){ out.push(pool[k]); seen[k]=1; } });
-  for(var i=0;i<MERCN.length && out.length<9;i++){ if(MERCN[i].indexOf(q)>-1 && !seen[MERCN[i]]){ out.push({nombre:MERC[i].n,cat:MERC[i].c,precio:MERC[i].p,merc:true}); seen[MERCN[i]]=1; } }
+  for(var i=0;i<MERCN.length && out.length<9;i++){ if(MERCN[i].indexOf(q)>-1 && !seen[MERCN[i]]){ out.push({nombre:MERC[i].n,cat:MERC[i].c,precio:MERC[i].p,img:MERC[i].img||'',merc:true}); seen[MERCN[i]]=1; } }
   if(!out.length){ box.style.display='none'; box.innerHTML=''; return; }
   box.style.display='block';
   box.innerHTML='<div class="card">'+out.slice(0,9).map(function(p){
     var pr=(p.precio!=null&&p.precio!=='')?(' <span style="color:var(--accent-soft-ink);font-size:12px">'+String(p.precio).replace('.',',')+' €</span>'):'';
     var tag=p.merc?' <span style="color:var(--muted);font-size:11px">· Merca</span>':'';
-    return '<div class="sug" data-n="'+esc(p.nombre)+'" data-c="'+esc(p.cat)+'" data-p="'+(p.precio!=null?p.precio:'')+'">'+(CAT_EMOJI[p.cat]||'')+' '+esc(p.nombre)+pr+tag+'</div>';
+    return '<div class="sug" data-n="'+esc(p.nombre)+'" data-c="'+esc(p.cat)+'" data-p="'+(p.precio!=null?p.precio:'')+'" data-img="'+esc(p.img||'')+'">'+(CAT_EMOJI[p.cat]||'')+' '+esc(p.nombre)+pr+tag+'</div>';
   }).join('')+'</div>';
 }
 function clearSuggest(){ var b=$('l-suggest'); b.style.display='none'; b.innerHTML=''; }
 $('l-nombre').addEventListener('input', renderSuggest);
-var pickedPrice='', pickedName='';
+var pickedPrice='', pickedName='', pickedImg='';
 $('l-suggest').addEventListener('click', function(e){ var s=e.target.closest('[data-n]'); if(!s) return;
   var nm=s.getAttribute('data-n'); $('l-nombre').value=nm; var c=s.getAttribute('data-c'); if(c) $('l-cat').value=c;
-  pickedPrice=s.getAttribute('data-p')||''; pickedName=nm; clearSuggest(); $('l-cant').focus();
+  pickedPrice=s.getAttribute('data-p')||''; pickedImg=s.getAttribute('data-img')||''; pickedName=nm; clearSuggest(); $('l-cant').focus();
 });
 $('l-add').addEventListener('click', addItem);
 $('l-nombre').addEventListener('keydown', function(e){ if(e.key==='Enter') addItem(); });
 function addItem(){
   var n=$('l-nombre').value.trim(); if(!n||!db) return;
-  var it={nombre:n, cantidad:$('l-cant').value.trim(), unidad:$('l-unid').value.trim(), categoria:$('l-cat').value, precio:(normStr(n)===normStr(pickedName)?pickedPrice:'')};
-  $('l-nombre').value='';$('l-cant').value='';$('l-unid').value='';clearSuggest();pickedPrice='';pickedName='';$('l-nombre').focus();
+  var match=(normStr(n)===normStr(pickedName));
+  var it={nombre:n, cantidad:$('l-cant').value.trim(), unidad:$('l-unid').value.trim(), categoria:$('l-cat').value, precio:(match?pickedPrice:''), img:(match?pickedImg:'')};
+  $('l-nombre').value='';$('l-cant').value='';$('l-unid').value='';clearSuggest();pickedPrice='';pickedName='';pickedImg='';$('l-nombre').focus();
   fbAddItem(it); buzz();
 }
 $('lista-body').addEventListener('click', function(e){
@@ -2525,25 +2522,28 @@ function renderProds(){
     var ph = p.img ? '<span class="ph"><img src="'+esc(p.img)+'" loading="lazy" onerror="this.parentNode.textContent=\''+(CAT_EMOJI[p.categoria]||'📦')+'\'"></span>' : '<span class="ph">'+(CAT_EMOJI[p.categoria]||'📦')+'</span>';
     var sub=[p.tienda?('🏪 '+esc(p.tienda)):'', p.veces?('×'+p.veces):''].filter(Boolean).join(' · ');
     var pr=(p.precio!=null&&p.precio!=='')?('<span class="pp">'+String(p.precio).replace('.',',')+' €</span>'):'';
-    return '<div class="prod" data-prod="'+p.id+'">'+ph+'<div class="pm"><div class="pn">'+esc(p.nombre)+'</div>'+(sub?'<div class="ps">'+sub+'</div>':'')+'</div>'+pr+'</div>';
+    return '<div class="prod" data-prod="'+p.id+'">'+ph+'<div class="pm"><div class="pn">'+esc(p.nombre)+'</div>'+(sub?'<div class="ps">'+sub+'</div>':'')+'</div>'+pr+'<button class="x" data-delprod="'+p.id+'" style="margin-left:4px">×</button></div>';
   }).join('')+'</div>';
-  lazyProdImages(list);
+  fillProdImages(list);
 }
-function lazyProdImages(list){
-  var need=list.filter(function(p){return !p.img && !imgFetching[p.id];}).slice(0,4);
-  need.forEach(function(p){ imgFetching[p.id]=1;
-    fetch('https://world.openfoodfacts.org/cgi/search.pl?search_terms='+encodeURIComponent(p.nombre)+'&fields=image_front_small_url&page_size=1&json=1')
-      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
-      .then(function(d){ var im=d&&d.products&&d.products[0]&&d.products[0].image_front_small_url; if(im&&db){ hcol('productos').doc(p.id).update({img:im}); } else { delete imgFetching[p.id]; } })
-      .catch(function(){ setTimeout(function(){ delete imgFetching[p.id]; }, 4000); });
-  });
+var MERCIMG=null;
+function mercImgFor(name){
+  if(!MERC.length) return '';
+  if(!MERCIMG){ MERCIMG={}; for(var i=0;i<MERC.length;i++){ if(MERC[i].img) MERCIMG[MERCN[i]]=MERC[i].img; } }
+  return MERCIMG[normStr(name)]||'';
 }
-$('l-prods').addEventListener('click', function(){ prodsQuery=''; $('prods-search').value=''; renderProds(); $('ov-prods').classList.add('on'); });
-$('prods-close').addEventListener('click', function(){ $('ov-prods').classList.remove('on'); });
+function fillProdImages(list){
+  if(!MERC.length||!db) return;
+  list.forEach(function(p){ if(!p.img && !imgFetching[p.id]){ var im=mercImgFor(p.nombre); if(im){ imgFetching[p.id]=1; hcol('productos').doc(p.id).update({img:im}); } } });
+}
 $('prods-search').addEventListener('input', function(){ prodsQuery=this.value; renderProds(); });
-$('prods-list').addEventListener('click', function(e){ var row=e.target.closest('[data-prod]'); if(!row||!db) return;
+$('prods-list').addEventListener('click', function(e){
+  if(!db) return;
+  var del=e.target.closest('[data-delprod]');
+  if(del){ hcol('productos').doc(del.getAttribute('data-delprod')).delete(); buzz(8); return; }
+  var row=e.target.closest('[data-prod]'); if(!row) return;
   var p=(S.productos||[]).filter(function(x){return x.id===row.getAttribute('data-prod');})[0]; if(!p) return;
-  fbAddItem({nombre:p.nombre, categoria:p.categoria, precio:p.precio||''}); toast('Añadido: '+p.nombre); buzz(10);
+  fbAddItem({nombre:p.nombre, categoria:p.categoria, precio:p.precio||'', img:p.img||''}); toast('Añadido: '+p.nombre); buzz(10);
 });
 
 /* habituales */
@@ -2576,7 +2576,7 @@ $('hab-addall').addEventListener('click', function(){
   });
 });
 
-['ov-rec','ov-slot','ov-gen','ov-desp','ov-name','ov-cfg','ov-hab','ov-item','ov-ticket','ov-gastos','ov-gasto','ov-prods'].forEach(function(id){ $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); }); });
+['ov-rec','ov-slot','ov-gen','ov-desp','ov-name','ov-cfg','ov-hab','ov-item','ov-ticket','ov-gastos','ov-gasto'].forEach(function(id){ $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); }); });
 
 /* tema: eventos */
 function openCfg(){ renderCfg(); $('cfg-ticket').value=localStorage.getItem('lcr_gemini_key')||''; $('ov-cfg').classList.add('on'); }
@@ -2603,11 +2603,12 @@ $('invite').addEventListener('click', function(){
 });
 
 /* nav */
-var TITLES={lista:'Lista de la compra',recetas:'Recetas',menu:'Menú semanal'};
+var TITLES={lista:'Lista de la compra',recetas:'Recetas',menu:'Menú semanal',prods:'Productos'};
 function switchView(v){
   document.querySelectorAll('.view').forEach(function(s){s.classList.toggle('on',s.id==='v-'+v);});
   document.querySelectorAll('nav button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-v')===v);});
-  $('ttl').textContent=TITLES[v];
+  $('ttl').textContent=TITLES[v]||'';
+  if(v==='prods'){ prodsQuery=''; if($('prods-search'))$('prods-search').value=''; renderProds(); }
   window.scrollTo(0,0);
 }
 document.querySelectorAll('nav button').forEach(function(b){ b.addEventListener('click',function(){switchView(b.getAttribute('data-v'));}); });
