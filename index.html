@@ -2534,11 +2534,12 @@ function mercMatch(name){
   var nn=normStr(name);
   if(MERCIMG[nn]) return MERCIMG[nn];           // 1) exacto
   var toks=nn.split(/[^a-z0-9]+/).filter(function(t){return t.length>=4;});
-  if(toks.length<2) return '';                  // 2) palabras clave (≥2 tokens de ≥4 letras)
-  var best='', bestLen=1e9;
-  for(var i=0;i<MERC.length;i++){ if(!MERC[i].img) continue; var mn=MERCN[i];
-    var ok=true; for(var k=0;k<toks.length;k++){ if(mn.indexOf(toks[k])<0){ ok=false; break; } }
-    if(ok && mn.length<bestLen){ best=MERC[i].img; bestLen=mn.length; }
+  if(!toks.length) return '';
+  // 2) mejor solape: más palabras compartidas, luego nombre más corto
+  var best='', bestScore=0, bestLen=1e9;
+  for(var i=0;i<MERC.length;i++){ if(!MERC[i].img) continue; var mn=MERCN[i], sc=0;
+    for(var k=0;k<toks.length;k++){ if(mn.indexOf(toks[k])>-1) sc++; }
+    if(sc>0 && (sc>bestScore || (sc===bestScore && mn.length<bestLen))){ best=MERC[i].img; bestScore=sc; bestLen=mn.length; }
   }
   return best;
 }
