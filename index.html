@@ -2326,10 +2326,10 @@ $('ticket-file').addEventListener('change', function(){
 function compressImage(file, cb){
   var img=new Image(); var url=URL.createObjectURL(file);
   img.onload=function(){
-    var max=1280, w=img.width, h=img.height;
+    var max=1100, w=img.width, h=img.height;
     if(w>h && w>max){ h=Math.round(h*max/w); w=max; } else if(h>=w && h>max){ w=Math.round(w*max/h); h=max; }
     var cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h);
-    URL.revokeObjectURL(url); cb(cv.toDataURL('image/jpeg',0.72));
+    URL.revokeObjectURL(url); cb(cv.toDataURL('image/jpeg',0.6));
   };
   img.onerror=function(){ URL.revokeObjectURL(url); toast('No se pudo leer la imagen'); };
   img.src=url;
@@ -2347,7 +2347,7 @@ function sendTicket(dataUrl){
   ticketPhoto=''; shrinkDataUrl(dataUrl, 760, 0.5, function(s){ ticketPhoto=s||''; });
   var b64=String(dataUrl).replace(/^data:image\/\w+;base64,/,'');
   var prompt='Eres un lector de tickets de supermercado en español. Devuelve SOLO JSON válido con esta forma exacta: {"tienda":string,"fecha":"YYYY-MM-DD","total":number,"items":[{"nombre":string,"cantidad":number,"precio":number}]}. nombre en minúsculas y legible (corrige abreviaturas obvias, p.ej. "TOMATE RAMA"->"tomate"). precio: precio total de esa línea en euros con punto decimal. cantidad: unidades o peso si aparece, si no 1. Ignora líneas que no sean productos (descuentos, totales, IVA, tarjeta). Si un dato no se ve pon null. No añadas texto fuera del JSON.';
-  var body={ contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:b64}}]}], generationConfig:{temperature:0, responseMimeType:'application/json'} };
+  var body={ contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:b64}}]}], generationConfig:{temperature:0, responseMimeType:'application/json', thinkingConfig:{thinkingBudget:0}} };
   var MODEL='gemini-3.8-flash', tries=0, maxTries=5;
   function extractText(j){
     var cands=j.candidates||[]; for(var i=0;i<cands.length;i++){ var parts=((cands[i].content||{}).parts)||[]; for(var k=0;k<parts.length;k++){ if(parts[k] && typeof parts[k].text==='string' && parts[k].text.trim()) return parts[k].text; } }
@@ -2359,7 +2359,7 @@ function sendTicket(dataUrl){
     tries++;
     $('ticket-meta').textContent = tries>1 ? ('Modelo ocupado, reintentando… ('+tries+'/'+maxTries+')') : 'Leyendo el ticket… (unos segundos)';
     var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
-    var timer=setTimeout(function(){ if(ctrl)ctrl.abort(); }, 90000);
+    var timer=setTimeout(function(){ if(ctrl)ctrl.abort(); }, 45000);
     fetch('https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent?key='+encodeURIComponent(geminiKey()), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:ctrl?ctrl.signal:undefined})
       .then(function(r){return r.text();})
       .then(function(raw){
@@ -2379,8 +2379,7 @@ function sendTicket(dataUrl){
         ticketPayer=USER||''; renderTicket();
       })
       .catch(function(e){ clearTimeout(timer);
-        if(e&&e.name==='AbortError' && tries<maxTries){ setTimeout(attempt, tries*2000); return; }
-        $('ticket-meta').textContent=(e&&e.name==='AbortError')?'Tardó demasiado. Prueba otra vez o una foto más nítida.':'No se pudo conectar con Gemini. Revisa conexión y clave.';
+        $('ticket-meta').textContent=(e&&e.name==='AbortError')?'Tardó demasiado (45s). Vuelve a pulsar 🧾 Ticket; Gemini estaba lento.':'No se pudo conectar con Gemini. Revisa conexión y clave.';
       });
   }
   attempt();
