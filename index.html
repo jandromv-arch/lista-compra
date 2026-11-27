@@ -160,6 +160,15 @@
   .sug{padding:11px 13px;border-bottom:1px solid var(--line);cursor:pointer;font-weight:500}
   .sug:last-child{border-bottom:none}
   .sug:active{background:var(--accent-soft)}
+  .prod{display:flex;align-items:center;gap:11px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+  .prod:last-child{border-bottom:none}
+  .prod:active{background:var(--accent-soft)}
+  .prod .ph{flex:none;width:42px;height:42px;border-radius:9px;background:var(--bg);display:grid;place-items:center;font-size:21px;overflow:hidden}
+  .prod .ph img{width:100%;height:100%;object-fit:cover}
+  .prod .pm{flex:1;min-width:0}
+  .prod .pn{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prod .ps{font-size:12.5px;color:var(--muted)}
+  .prod .pp{flex:none;font-weight:700;font-size:14px;color:var(--accent-soft-ink)}
 </style>
 <script>(function(){try{var t=localStorage.getItem('lcr_theme')||'verde';var m=localStorage.getItem('lcr_mode')||'auto';var d=document.documentElement;if(t&&t!=='verde')d.setAttribute('data-theme',t);var dark=m==='dark'||(m==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(dark)d.setAttribute('data-mode','dark');}catch(e){}})();</script>
 </head>
@@ -201,6 +210,7 @@
     <div style="margin-top:18px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
       <button class="btn ghost sm" id="l-scan">📷 Escanear</button>
       <button class="btn ghost sm" id="l-ticket">🧾 Ticket</button>
+      <button class="btn ghost sm" id="l-prods">📦 Productos</button>
       <button class="btn ghost sm" id="l-gastos">💶 Gastos</button>
       <button class="btn ghost sm" id="l-wa">📲 WhatsApp</button>
       <button class="btn ghost sm" id="l-hab">⭐ Habituales</button>
@@ -326,6 +336,16 @@
     <div style="display:flex;gap:8px;margin:12px 0"><button class="btn ghost sm" id="gasto-add">+ Gasto manual</button></div>
     <div id="gastos-list"></div>
     <div style="margin-top:14px"><button class="btn ghost wide" id="gastos-close">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="ov" id="ov-prods">
+  <div class="sheet">
+    <h2>📦 Productos</h2>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 8px">Todo lo que compráis (precio y súper). Toca uno para añadirlo a la lista.</p>
+    <div class="searchbar"><input id="prods-search" placeholder="Buscar producto…" autocomplete="off"></div>
+    <div id="prods-list"></div>
+    <button class="btn ghost wide" id="prods-close" style="margin-top:12px">Cerrar</button>
   </div>
 </div>
 
@@ -1721,14 +1741,24 @@ function fbAddItem(it){ fbSaveProducto(it); return hcol('items').add({nombre:it.
 function fbSaveProducto(it){
   if(!db||!it||!it.nombre) return Promise.resolve();
   var ex=(S.productos||[]).filter(function(p){return normStr(p.nombre)===normStr(it.nombre);})[0];
-  var data={nombre:it.nombre, categoria:it.categoria||'Otros'};
-  if(it.precio) data.precio=it.precio;
-  if(it.barcode) data.barcode=it.barcode;
-  if(ex){ // actualiza precio/categoría si ha cambiado
-    if((it.precio && String(it.precio)!==String(ex.precio)) || (it.categoria && it.categoria!==ex.categoria)){ return hcol('productos').doc(ex.id).update(data); }
+  var now=Date.now();
+  if(ex){
+    var upd={};
+    if(it.categoria && it.categoria!=='Otros' && it.categoria!==ex.categoria) upd.categoria=it.categoria;
+    if(it.precio!=null && it.precio!=='' && String(it.precio)!==String(ex.precio)) upd.precio=String(it.precio);
+    if(it.tienda && it.tienda!==ex.tienda) upd.tienda=it.tienda;
+    if(it.barcode && !ex.barcode) upd.barcode=it.barcode;
+    if(it.img && !ex.img) upd.img=it.img;
+    if(it.bought){ upd.lastBought=now; upd.veces=(Number(ex.veces)||0)+1; }
+    if(Object.keys(upd).length) return hcol('productos').doc(ex.id).update(upd);
     return Promise.resolve();
   }
-  data.creado=Date.now();
+  var data={nombre:it.nombre, categoria:it.categoria||'Otros', creado:now};
+  if(it.precio!=null && it.precio!=='') data.precio=String(it.precio);
+  if(it.tienda) data.tienda=it.tienda;
+  if(it.barcode) data.barcode=it.barcode;
+  if(it.img) data.img=it.img;
+  if(it.bought){ data.lastBought=now; data.veces=1; }
   return hcol('productos').add(data);
 }
 function fbToggleItem(id,comprado){ return hcol('items').doc(id).update({comprado:!!comprado, boughtBy: comprado?(USER||''):''}); }
@@ -1786,7 +1816,7 @@ function addRecipeToList(recetaId,raciones){ var rec=S.recetas.filter(function(r
   return fbAddItems(items).then(function(){return {added:added,skipped:skipped};}); }
 
 /* ================= RENDER ================= */
-function render(){ renderLista(); renderRecetas(); renderMenu(); renderDatalist(); renderDespensa(); renderStaples(); updateAlerts(); if($('ov-gastos')&&$('ov-gastos').classList.contains('on')) renderGastos(); }
+function render(){ renderLista(); renderRecetas(); renderMenu(); renderDatalist(); renderDespensa(); renderStaples(); updateAlerts(); if($('ov-gastos')&&$('ov-gastos').classList.contains('on')) renderGastos(); if($('ov-prods')&&$('ov-prods').classList.contains('on')) renderProds(); }
 function updateAlerts(){
   var w=$('cfg-warn'); if(!w) return;
   var soon=(S.despensa||[]).filter(function(x){var dd=diasHasta(x.caduca); return dd!=null && dd<=2;});
@@ -2264,14 +2294,14 @@ function startScan(){
 }
 function onBarcode(code){ stopScan(); $('scan-status').textContent='Buscando '+code+'…'; lookupProduct(code); }
 function lookupProduct(code){
-  fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=product_name,product_name_es,generic_name_es,brands,quantity,categories_tags')
+  fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=product_name,product_name_es,generic_name_es,brands,quantity,categories_tags,image_front_small_url')
     .then(function(r){return r.json();})
     .then(function(d){
       if(d && d.status===1 && d.product){
         var p=d.product;
         var name=p.product_name_es||p.product_name||p.generic_name_es||p.brands||('Producto '+code);
         var cat=offCategory(p.categories_tags);
-        fbSaveProducto({nombre:name, categoria:cat, barcode:code});
+        fbSaveProducto({nombre:name, categoria:cat, barcode:code, img:p.image_front_small_url||''});
         $('ov-scan').classList.remove('on');
         $('l-nombre').value=name; $('l-cant').value=p.quantity||''; $('l-unid').value=''; $('l-cat').value=cat; pickedPrice=''; pickedName='';
         switchView('lista'); toast('📷 Guardado: '+name+' — pon cantidad y Añade'); buzz(14);
@@ -2304,9 +2334,17 @@ function compressImage(file, cb){
   img.onerror=function(){ URL.revokeObjectURL(url); toast('No se pudo leer la imagen'); };
   img.src=url;
 }
-var ticketItems=[], ticketMeta={};
+function shrinkDataUrl(dataUrl, max, q, cb){
+  var img=new Image();
+  img.onload=function(){ var w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>=w&&h>max){w=Math.round(w*max/h);h=max;}
+    var cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); try{ cb(cv.toDataURL('image/jpeg',q)); }catch(e){ cb(''); } };
+  img.onerror=function(){ cb(''); };
+  img.src=dataUrl;
+}
+var ticketItems=[], ticketMeta={}, ticketPhoto='';
 function sendTicket(dataUrl){
   $('ticket-meta').textContent='Leyendo el ticket… (unos segundos)'; $('ticket-list').innerHTML=''; $('ov-ticket').classList.add('on');
+  ticketPhoto=''; shrinkDataUrl(dataUrl, 760, 0.5, function(s){ ticketPhoto=s||''; });
   var b64=String(dataUrl).replace(/^data:image\/\w+;base64,/,'');
   var prompt='Eres un lector de tickets de supermercado en español. Devuelve SOLO JSON válido con esta forma exacta: {"tienda":string,"fecha":"YYYY-MM-DD","total":number,"items":[{"nombre":string,"cantidad":number,"precio":number}]}. nombre en minúsculas y legible (corrige abreviaturas obvias, p.ej. "TOMATE RAMA"->"tomate"). precio: precio total de esa línea en euros con punto decimal. cantidad: unidades o peso si aparece, si no 1. Ignora líneas que no sean productos (descuentos, totales, IVA, tarjeta). Si un dato no se ve pon null. No añadas texto fuera del JSON.';
   var body={ contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:b64}}]}], generationConfig:{temperature:0, responseMimeType:'application/json'} };
@@ -2366,14 +2404,16 @@ function renderTicket(){
   $('ticket-meta').textContent=(m.tienda?m.tienda+' · ':'')+(m.fecha||'')+(m.total!=null?' · Total '+String(m.total).replace('.',',')+' €':'')+' — marca lo que aplicar:';
   if(!ticketItems.length){ $('ticket-list').innerHTML='<div class="empty-state" style="padding:16px">No reconocí productos. Prueba otra foto más nítida.</div>'; return; }
   $('ticket-list').innerHTML='<div class="card">'+ticketItems.map(function(it,i){
-    return '<div class="pv-item'+(it.sel?' sel':'')+'" data-ti="'+i+'" style="gap:8px"><div class="pv-cb" data-tk="cb"><svg width="12" height="12" viewBox="0 0 13 13"><path d="M2 7l3 3 6-7" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
+    return '<div class="pv-item'+(it.sel?' sel':'')+'" data-ti="'+i+'" style="gap:6px"><div class="pv-cb" data-tk="cb"><svg width="12" height="12" viewBox="0 0 13 13"><path d="M2 7l3 3 6-7" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
       '<input class="tk-n" value="'+esc(it.nombre)+'" style="flex:1;padding:7px 9px;font-size:14px">'+
-      '<input class="tk-p" value="'+(it.precio!=null?it.precio:'')+'" inputmode="decimal" placeholder="€" style="width:58px;padding:7px 6px;font-size:13px;text-align:right"></div>';
+      '<input class="tk-q" value="'+(it.cantidad!=null?it.cantidad:'')+'" inputmode="decimal" title="cantidad" style="width:38px;padding:7px 4px;font-size:13px;text-align:center">'+
+      '<input class="tk-p" value="'+(it.precio!=null?it.precio:'')+'" inputmode="decimal" placeholder="€" style="width:54px;padding:7px 6px;font-size:13px;text-align:right"></div>';
   }).join('')+'</div>';
 }
 $('ticket-list').addEventListener('click', function(e){ var cb=e.target.closest('[data-tk="cb"]'); if(!cb)return; var r=cb.closest('[data-ti]'); var it=ticketItems[+r.getAttribute('data-ti')]; it.sel=!it.sel; r.classList.toggle('sel',it.sel); });
 $('ticket-list').addEventListener('input', function(e){ var r=e.target.closest('[data-ti]'); if(!r)return; var it=ticketItems[+r.getAttribute('data-ti')]; if(!it)return;
   if(e.target.classList.contains('tk-n')) it.nombre=e.target.value;
+  else if(e.target.classList.contains('tk-q')){ var q=parseFloat(String(e.target.value).replace(',','.')); it.cantidad=isNaN(q)?'':q; }
   else if(e.target.classList.contains('tk-p')){ var v=parseFloat(String(e.target.value).replace(',','.')); it.precio=isNaN(v)?null:v; }
 });
 $('ticket-cancel').addEventListener('click', function(){ $('ov-ticket').classList.remove('on'); });
@@ -2388,6 +2428,7 @@ $('ticket-apply').addEventListener('click', function(){
     var payer=ticketPayer||USER||'';
     if(match){ b.update(hcol('items').doc(match.id), {comprado:true, boughtBy:payer, precio:(it.precio!=null?String(it.precio):(match.precio||''))}); }
     else { var ref=hcol('items').doc(); b.set(ref,{nombre:it.nombre,cantidad:String(it.cantidad||''),unidad:'',categoria:'Otros',precio:(it.precio!=null?String(it.precio):''),comprado:true,addedBy:payer,boughtBy:payer,creado:Date.now()}); }
+    fbSaveProducto({nombre:it.nombre, categoria:(match?match.categoria:'Otros'), precio:it.precio, tienda:ticketMeta.tienda, bought:true});
   });
   var tot=ticketMeta.total; if(tot==null){ tot=0; sel.forEach(function(it){ if(it.precio!=null) tot+=it.precio; }); }
   b.set(hcol('compras').doc(), {tienda:ticketMeta.tienda||'', fecha:ticketMeta.fecha||new Date().toISOString().slice(0,10), total:Math.round(tot*100)/100, nItems:sel.length, by:(ticketPayer||USER||''), creado:Date.now()});
@@ -2459,6 +2500,39 @@ $('gastos-list').addEventListener('click', function(e){
   fbDeleteCompra(id).then(function(){ toast('Compra borrada'); });
 });
 
+/* ===== catálogo de productos ===== */
+var prodsQuery='', imgFetching={};
+function renderProds(){
+  var el=$('prods-list'); if(!el) return; var q=normStr(prodsQuery);
+  var list=(S.productos||[]).slice();
+  if(q) list=list.filter(function(p){return normStr(p.nombre).indexOf(q)>-1;});
+  list.sort(function(a,b){ return (Number(b.veces)||0)-(Number(a.veces)||0) || normStr(a.nombre).localeCompare(normStr(b.nombre)); });
+  if(!list.length){ el.innerHTML='<div class="empty-state" style="padding:20px;color:var(--muted)">'+(q?'Sin resultados.':'Aún no hay productos. Se llenan al comprar un ticket o escanear.')+'</div>'; return; }
+  el.innerHTML='<div class="card">'+list.slice(0,200).map(function(p){
+    var ph = p.img ? '<span class="ph"><img src="'+esc(p.img)+'" loading="lazy" onerror="this.parentNode.textContent=\''+(CAT_EMOJI[p.categoria]||'📦')+'\'"></span>' : '<span class="ph">'+(CAT_EMOJI[p.categoria]||'📦')+'</span>';
+    var sub=[p.tienda?('🏪 '+esc(p.tienda)):'', p.veces?('×'+p.veces):''].filter(Boolean).join(' · ');
+    var pr=(p.precio!=null&&p.precio!=='')?('<span class="pp">'+String(p.precio).replace('.',',')+' €</span>'):'';
+    return '<div class="prod" data-prod="'+p.id+'">'+ph+'<div class="pm"><div class="pn">'+esc(p.nombre)+'</div>'+(sub?'<div class="ps">'+sub+'</div>':'')+'</div>'+pr+'</div>';
+  }).join('')+'</div>';
+  lazyProdImages(list);
+}
+function lazyProdImages(list){
+  var need=list.filter(function(p){return !p.img && !imgFetching[p.id];}).slice(0,4);
+  need.forEach(function(p){ imgFetching[p.id]=1;
+    fetch('https://world.openfoodfacts.org/cgi/search.pl?search_terms='+encodeURIComponent(p.nombre)+'&fields=image_front_small_url&page_size=1&json=1')
+      .then(function(r){return r.json();})
+      .then(function(d){ var im=d&&d.products&&d.products[0]&&d.products[0].image_front_small_url; if(im&&db){ hcol('productos').doc(p.id).update({img:im}); } })
+      .catch(function(){});
+  });
+}
+$('l-prods').addEventListener('click', function(){ prodsQuery=''; $('prods-search').value=''; renderProds(); $('ov-prods').classList.add('on'); });
+$('prods-close').addEventListener('click', function(){ $('ov-prods').classList.remove('on'); });
+$('prods-search').addEventListener('input', function(){ prodsQuery=this.value; renderProds(); });
+$('prods-list').addEventListener('click', function(e){ var row=e.target.closest('[data-prod]'); if(!row||!db) return;
+  var p=(S.productos||[]).filter(function(x){return x.id===row.getAttribute('data-prod');})[0]; if(!p) return;
+  fbAddItem({nombre:p.nombre, categoria:p.categoria, precio:p.precio||''}); toast('Añadido: '+p.nombre); buzz(10);
+});
+
 /* habituales */
 fillCats($('hab-cat'));
 function fbAddStaple(it){ if(S.staples.some(function(x){return normStr(x.nombre)===normStr(it.nombre);})) return Promise.resolve(); return hcol('staples').add({nombre:it.nombre,cantidad:it.cantidad||'',unidad:it.unidad||'',categoria:it.categoria||'Otros'}); }
@@ -2489,7 +2563,7 @@ $('hab-addall').addEventListener('click', function(){
   });
 });
 
-['ov-rec','ov-slot','ov-gen','ov-desp','ov-name','ov-cfg','ov-hab','ov-item','ov-ticket','ov-gastos','ov-gasto'].forEach(function(id){ $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); }); });
+['ov-rec','ov-slot','ov-gen','ov-desp','ov-name','ov-cfg','ov-hab','ov-item','ov-ticket','ov-gastos','ov-gasto','ov-prods'].forEach(function(id){ $(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); }); });
 
 /* tema: eventos */
 function openCfg(){ renderCfg(); $('cfg-ticket').value=localStorage.getItem('lcr_gemini_key')||''; $('ov-cfg').classList.add('on'); }
