@@ -2534,7 +2534,12 @@ function mercImgFor(name){
 }
 function fillProdImages(list){
   if(!MERC.length||!db) return;
-  list.forEach(function(p){ if(!p.img && !imgFetching[p.id]){ var im=mercImgFor(p.nombre); if(im){ imgFetching[p.id]=1; hcol('productos').doc(p.id).update({img:im}); } } });
+  list.forEach(function(p){
+    if(imgFetching[p.id]) return;
+    var im=mercImgFor(p.nombre); if(!im || p.img===im) return;
+    var isOff=p.img && /openfoodfacts/i.test(p.img);
+    if(!p.img || isOff){ imgFetching[p.id]=1; hcol('productos').doc(p.id).update({img:im}); }
+  });
 }
 $('prods-search').addEventListener('input', function(){ prodsQuery=this.value; renderProds(); });
 $('prods-list').addEventListener('click', function(e){
